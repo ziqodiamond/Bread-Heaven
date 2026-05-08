@@ -17,10 +17,18 @@
                     @foreach ($cartItems as $item)
                         <li class="flex items-center justify-between gap-4">
                             <div class="flex items-center gap-4">
-                                <img src="{{ asset('storage/' . $item->product->image_url) }}"
-                                    alt="{{ $item->product->name }}" class="size-16 rounded object-cover" />
+                                @if ($item->product)
+                                    <!-- Menampilkan gambar produk jika ada -->
+                                    <img src="{{ asset('storage/' . $item->product->image_url) }}"
+                                        alt="{{ $item->product->name }}" class="size-16 rounded object-cover" />
+                                @else
+                                    <!-- Menampilkan gambar default jika produk tidak ada -->
+                                    <img src="{{ asset('images/default-product.jpg') }}" alt="Default Image"
+                                        class="size-16 rounded object-cover" />
+                                @endif
                                 <div>
-                                    <h3 class="text-sm text-gray-900">{{ $item->product->name }}</h3>
+                                    <h3 class="text-sm text-gray-900">
+                                        {{ $item->product->name ?? 'Produk tidak tersedia' }}</h3>
                                     <dl class="mt-0.5 space-y-px text-[10px] text-gray-600">
                                         <div>
                                             <dt class="inline">Quantity:</dt>
@@ -28,7 +36,7 @@
                                         </div>
                                         <div>
                                             <dt class="inline">Price:</dt>
-                                            <dd class="inline">${{ $item->product->price }}</dd>
+                                            <dd class="inline">Rp {{ $item->product->price ?? 'N/A' }}</dd>
                                         </div>
                                     </dl>
                                 </div>
@@ -58,12 +66,12 @@
                     View my cart ({{ $cartItems->count() }})
                 </a>
 
-                <a href="#"
+                <a href="{{ route('checkout.index') }}"
                     class="block rounded bg-gray-700 px-5 py-3 text-sm text-gray-100 transition hover:bg-gray-600">
                     Checkout
                 </a>
 
-                <a href="#" id="continue-shopping"
+                <a href="{{ route('products') }}" id="continue-shopping"
                     class="inline-block text-sm text-gray-500 underline underline-offset-4 transition hover:text-gray-600">
                     Continue shopping
                 </a>

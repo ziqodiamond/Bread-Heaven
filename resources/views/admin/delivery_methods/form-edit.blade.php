@@ -1,5 +1,5 @@
 <!-- resources/views/admin/payment_methods/form-edit.blade.php -->
-<form id="editForm{{ $method->id }}" action="{{ route('payment-methods.update', $method->id) }}" method="POST"
+<form id="editForm{{ $method->id }}" action="{{ route('delivery-methods.update', $method->id) }}" method="POST"
     enctype="multipart/form-data">
     @csrf
     @method('PUT')
@@ -7,7 +7,7 @@
     <div class="mb-4">
         <label for="edit_name{{ $method->id }}" class="block text-gray-700 dark:text-gray-200">Delivery Method
             Name</label>
-        <input type="text" id="edit_name{{ $method->id }}" name="nama"
+        <input type="text" id="edit_name{{ $method->id }}" name="name"
             class="w-full bg-white border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
             value="{{ $method->nama }}" required>
     </div>
@@ -25,7 +25,7 @@
         <select id="edit_status{{ $method->id }}" name="status"
             class="block appearance-none w-full bg-white border border-gray-300 rounded-md py-2 px-3 leading-tight focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white">
             <option value="available" {{ $method->status === 'available' ? 'selected' : '' }}>Available</option>
-            <option value="not available" {{ $method->status === 'not available' ? 'selected' : '' }}>Not
+            <option value="not_available" {{ $method->status === 'not_available' ? 'selected' : '' }}>Not
                 Available</option>
         </select>
     </div>

@@ -34,6 +34,20 @@ class DeliveryMethodController extends Controller
         return redirect()->back()->with('success', 'Payment method created successfully.');
     }
 
+    public function update(Request $request, DeliveryMethod $deliveryMethod)
+    {
+        $validatedData = $request->validate([
+            'name' => 'required|string|max:255',
+            'shipping_cost' => 'required|numeric',
+            'status' => 'required|in:available,not_available',
+        ]);
+
+        // Perbarui payment method dengan data yang divalidasi
+        $deliveryMethod->update($validatedData);
+
+        return redirect()->back()->with('success', 'Delivery method updated successfully.');
+    }
+
     public function destroy(DeliveryMethod $deliveryMethod)
     {
         $deliveryMethod->delete();

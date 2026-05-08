@@ -2,12 +2,14 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\CartController;
+use App\Http\Controllers\Usercontroller;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\GeneralController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\DeliveryMethodController;
 
@@ -53,11 +55,25 @@ Route::prefix('admin')->group(function () {
     // Route to store a newly created payment method
     Route::post('/delivery-methods', [DeliveryMethodController::class, 'store'])->name('delivery-methods.store');
     // Route to show the form to edit an existing payment method
-    Route::get('/delivery-methods/{paymentMethod}/edit', [DeliveryMethodController::class, 'edit'])->name('payment-methods.edit');
+    Route::get('/delivery-methods/{paymentMethod}/edit', [DeliveryMethodController::class, 'edit'])->name('delivery-methods.edit');
     // Route to update an existing payment method
-    Route::put('/delivery-methods/{paymentMethod}', [DeliveryMethodController::class, 'update'])->name('payment-methods.update');
+    Route::put('/delivery-methods/{paymentMethod}', [DeliveryMethodController::class, 'update'])->name('delivery-methods.update');
     // Route to delete an existing payment method
     Route::delete('/delivery-methods/{deliveryMethod}', [DeliveryMethodController::class, 'destroy'])->name('delivery-methods.destroy');
+
+    Route::get('/transactions', [TransactionController::class, 'index'])->name('transaction.index');
+    Route::get('/transactions/{id}/edit', [TransactionController::class, 'edit'])->name('transaction.edit');
+    Route::get('/transactions/{id}/cancel', [TransactionController::class, 'cancel'])->name('transaction.cancel');
+    Route::get('/transactions/{id}/accept', [TransactionController::class, 'accept'])->name('transaction.accept');
+    Route::get('/transactions/{id}/ship', [TransactionController::class, 'ship'])->name('transaction.ship');
+    Route::get('/transactions/{id}/complete', [TransactionController::class, 'complete'])->name('transaction.complete');
+    Route::delete('/transactions/{id}', [TransactionController::class, 'destroy'])->name('transaction.destroy');
+
+    Route::get('/users', [Usercontroller::class, 'index'])->name('admin.users.index');
+    Route::get('/users/{id}/edit', [Usercontroller::class, 'edit'])->name('admin.users.edit');
+    Route::put('/users/{id}', [Usercontroller::class, 'update'])->name('admin.users.update');
+    Route::delete('/users/{id}', [Usercontroller::class, 'destroy'])->name('admin.users.destroy');
+    Route::put('/users/{id}/promote', [Usercontroller::class, 'promote'])->name('admin.users.promote');
 })->middleware(AdminMiddleware::class);;
 
 Route::middleware('auth')->group(function () {
@@ -67,10 +83,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
     Route::get('/cart/show', [CartController::class, 'show'])->name('cart.show');
     Route::get('/cart/add', [CartController::class, 'add'])->name('cart.add');
-    Route::patch('/cart/update/{cartItem}', [CartController::class, 'update'])->name('cart.update');
+    Route::put('/cart/update/{cartItem}', [CartController::class, 'update'])->name('cart.update');
     Route::delete('/cart/remove/{cartItem}', [CartController::class, 'removeItem'])->name('cart.remove');
     Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
-    Route::post('/checkout/proceed', [CheckoutController::class, 'proceedToPayment'])->name('checkout.proceed');
+    Route::post('/checkout/proceed', [CheckoutController::class, 'proceed'])->name('checkout.proceed');
+    Route::get('/transaction/history', [TransactionController::class, 'history'])->name('transaction.history');
+    Route::get('/transaction/{id}', [TransactionController::class, 'show'])->name('transaction.show');
 });
 
 require __DIR__ . '/auth.php';

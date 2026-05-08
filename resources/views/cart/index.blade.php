@@ -1,9 +1,4 @@
 <x-layout>
-
-
-
-
-
     <section class="bg-white py-8 antialiased dark:bg-gray-900 md:py-16">
         <div class="mx-auto max-w-screen-xl px-4 2xl:px-0">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">Shopping Cart</h2>
@@ -26,32 +21,43 @@
                                     </a>
 
                                     <div class="flex items-center justify-between md:order-3 md:justify-end">
-                                        <div class="flex items-center">
-                                            <button type="button"
-                                                class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 dark:focus:ring-gray-700">
-                                                <svg class="h-2.5 w-2.5 text-gray-900 dark:text-white"
-                                                    aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                                    viewBox="0 0 18 2">
-                                                    <path stroke="currentColor" stroke-linecap="round"
-                                                        stroke-linejoin="round" stroke-width="2" d="M1 1h16" />
-                                                </svg>
-                                            </button>
-                                            <input type="text"
-                                                class="w-10 shrink-0 border-0 bg-transparent text-center text-sm font-medium text-gray-900 focus:outline-none focus:ring-0 dark:text-white"
-                                                value="{{ $item->quantity }}" />
-                                            <button type="button"
-                                                class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 dark:focus:ring-gray-700">
-                                                <svg class="h-2.5 w-2.5 text-gray-900 dark:text-white"
-                                                    aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                                    viewBox="0 0 18 18">
-                                                    <path stroke="currentColor" stroke-linecap="round"
-                                                        stroke-linejoin="round" stroke-width="2" d="M9 1v16M1 9h16" />
-                                                </svg>
-                                            </button>
-                                        </div>
+                                        <form action="{{ route('cart.update', $item->id) }}" method="POST">
+                                            @csrf
+                                            @method('PUT')
+
+                                            <div class="flex items-center">
+                                                <!-- Tombol untuk mengurangi quantity -->
+                                                <button type="submit" name="quantity" value="{{ $item->quantity - 1 }}"
+                                                    class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 dark:focus:ring-gray-700">
+                                                    <svg class="h-2.5 w-2.5 text-gray-900 dark:text-white"
+                                                        aria-hidden="true" xmlns="http://www.w3.org/2000/svg"
+                                                        fill="none" viewBox="0 0 18 2">
+                                                        <path stroke="currentColor" stroke-linecap="round"
+                                                            stroke-linejoin="round" stroke-width="2" d="M1 1h16" />
+                                                    </svg>
+                                                </button>
+
+                                                <!-- Input untuk quantity -->
+                                                <input type="text"
+                                                    class="w-10 shrink-0 border-0 bg-transparent text-center text-sm font-medium text-gray-900 focus:outline-none focus:ring-0 dark:text-white"
+                                                    value="{{ $item->quantity }}" readonly />
+
+                                                <!-- Tombol untuk menambah quantity -->
+                                                <button type="submit" name="quantity" value="{{ $item->quantity + 1 }}"
+                                                    class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 dark:focus:ring-gray-700">
+                                                    <svg class="h-2.5 w-2.5 text-gray-900 dark:text-white"
+                                                        aria-hidden="true" xmlns="http://www.w3.org/2000/svg"
+                                                        fill="none" viewBox="0 0 18 18">
+                                                        <path stroke="currentColor" stroke-linecap="round"
+                                                            stroke-linejoin="round" stroke-width="2"
+                                                            d="M9 1v16M1 9h16" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </form>
                                         <div class="text-end md:order-4 md:w-32">
                                             <p class="text-base font-bold text-gray-900 dark:text-white">
-                                                ${{ number_format($item->product->price * $item->quantity, 2) }}</p>
+                                                Rp{{ number_format($item->product->price * $item->quantity, 2) }}</p>
                                         </div>
                                     </div>
 
@@ -107,20 +113,20 @@
                                     <dt class="text-base font-normal text-gray-500 dark:text-gray-400">Original price
                                     </dt>
                                     <dd class="text-base font-medium text-gray-900 dark:text-white">
-                                        ${{ number_format($totalPrice, 2) }}</dd>
+                                        Rp{{ number_format($totalPrice, 2) }}</dd>
                                 </dl>
 
                                 <dl class="flex items-center justify-between gap-4">
                                     <dt class="text-base font-normal text-gray-500 dark:text-gray-400">Tax</dt>
                                     <dd class="text-base font-medium text-gray-900 dark:text-white">
-                                        ${{ number_format($tax, 2) }}</dd>
+                                        Rp{{ number_format($tax, 2) }}</dd>
                                 </dl>
 
                                 <dl
                                     class="flex items-center justify-between gap-4 border-t border-gray-200 pt-2 dark:border-gray-700">
                                     <dt class="text-base font-bold text-gray-900 dark:text-white">Total</dt>
                                     <dd class="text-base font-bold text-gray-900 dark:text-white">
-                                        ${{ number_format($totalPrice + $tax, 2) }}</dd>
+                                        Rp{{ number_format($totalPrice + $tax, 2) }}</dd>
                                 </dl>
                             </div>
 
@@ -136,7 +142,7 @@
                                     <svg class="h-5 w-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"
                                         fill="none" viewBox="0 0 24 24">
                                         <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                            stroke-width="2" d="M19 12H5m14 0-4 4m4-4-4-4" />
+                                            stroke-width="2" d="M11 17 6 12m0 0 5-5m-5 5h12" />
                                     </svg>
                                 </a>
                             </div>
@@ -146,7 +152,4 @@
             </div>
         </div>
     </section>
-
-
-
 </x-layout>

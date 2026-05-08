@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\PaymentMethod;
+use Illuminate\Support\Facades\Storage;
 
 class PaymentMethodController extends Controller
 {
@@ -37,10 +38,17 @@ class PaymentMethodController extends Controller
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
             'category' => 'required|string|max:255',
-            'fee' => 'required|numeric',
+            'account_number' => 'nullable|string|max:50',
+            'image_url' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'fee' => 'nullable|numeric',
             'status' => 'required|in:available,not_available',
         ]);
 
+        // Mengunggah gambar jika ada
+        if ($request->hasFile('image_url')) {
+            $imagePath = $request->file('image_url')->store('payment_images', 'public');
+            $validatedData['image_url'] = $imagePath;
+        }
 
         PaymentMethod::create($validatedData);
 
@@ -58,17 +66,31 @@ class PaymentMethodController extends Controller
     public function update(Request $request, PaymentMethod $paymentMethod)
     {
         $validatedData = $request->validate([
-            'nama' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'category' => 'required|string|max:255',
+            'account_number' => 'nullable|string|max:50',
+            'image_url' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'fee' => 'required|numeric',
             'status' => 'required|in:available,not_available',
         ]);
 
+        // Cek apakah ada file gambar yang diunggah
+        if ($request->hasFile('image_url')) {
+            // Hapus gambar lama jika ada
+            if ($paymentMethod->image_url) {
+                Storage::delete($paymentMethod->image_url);
+            }
 
+            // Simpan gambar yang baru diunggah
+            $validatedData['image_url'] = $request->file('image_url')->store('payment-images');
+        }
+
+        // Perbarui payment method dengan data yang divalidasi
         $paymentMethod->update($validatedData);
 
         return redirect()->back()->with('success', 'Payment method updated successfully.');
     }
+
 
 
     public function destroy(PaymentMethod $paymentMethod)

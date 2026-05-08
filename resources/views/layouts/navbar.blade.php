@@ -12,7 +12,8 @@
                         <x-navlink href="/" :active="request()->is('/')">Beranda</x-navlink>
                         <x-navlink href="/products" :active="request()->is('products')">Product</x-navlink>
                         @auth
-                            <x-navlink href="/about" :active="request()->is('about')">Riwayat Transaksi</x-navlink>
+                            <x-navlink href="{{ route('transaction.history') }}" :active="request()->is('transaction.history')">Riwayat
+                                Transaksi</x-navlink>
                         @endauth
                     </div>
                 </div>
@@ -85,9 +86,10 @@
                         <span class="sr-only">Open user menu</span>
                         @auth
                             <img class="h-8 w-8 rounded-full"
-                                src="{{ asset('storage/' . Auth::user()->profile_photo_path) }}" alt="User profile photo">
+                                src="{{ asset('storage/general_images/profile.jpg' . Auth::user()->profile_photo_path) }}"
+                                alt="User profile photo">
                         @else
-                            <img class="h-8 w-8 rounded-full" src="{{ asset('storage/profile_photos/guest.jpg') }}"
+                            <img class="h-8 w-8 rounded-full" src="{{ asset('storage/general_images/profile.jpg') }}"
                                 alt="Default profile photo">
                         @endauth
                     </button>

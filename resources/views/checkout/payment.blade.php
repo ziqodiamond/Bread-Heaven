@@ -8,7 +8,7 @@
                     <div class="flex h-5 items-center">
                         <input id="payment-method-{{ $paymentMethod->id }}"
                             aria-describedby="payment-method-text-{{ $paymentMethod->id }}" type="radio"
-                            name="payment-method" value="{{ $paymentMethod->id }}"
+                            name="payment-method" value="{{ $paymentMethod->id }}" data-fee="{{ $paymentMethod->fee }}"
                             class="h-4 w-4 border-gray-300 bg-white text-primary-600 focus:ring-2 focus:ring-primary-600 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                             {{ $loop->first ? 'checked' : '' }} />
                     </div>
@@ -21,14 +21,9 @@
                         <p id="payment-method-text-{{ $paymentMethod->id }}"
                             class="mt-1 text-xs font-normal text-gray-500 dark:text-gray-400">
                             {{ $paymentMethod->category }}
-                            {{-- @if ($paymentMethod->fee > 0)
-                                +${{ number_format($paymentMethod->fee, 2) }}
-                            @endif --}}
                         </p>
                     </div>
                 </div>
-
-
             </div>
         @endforeach
     </div>

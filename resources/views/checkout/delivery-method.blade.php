@@ -9,6 +9,7 @@
                         <input id="delivery-method-{{ $deliveryMethod->id }}"
                             aria-describedby="delivery-method-text-{{ $deliveryMethod->id }}" type="radio"
                             name="delivery-method" value="{{ $deliveryMethod->id }}"
+                            data-shipping-cost="{{ $deliveryMethod->shipping_cost }}"
                             class="h-4 w-4 border-gray-300 bg-white text-primary-600 focus:ring-2 focus:ring-primary-600 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                             {{ $loop->first ? 'checked' : '' }} />
                     </div>

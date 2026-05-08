@@ -6,16 +6,16 @@
             <label for="nama" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
                 Your name
             </label>
-            <input type="text" id="nama"
+            <input type="text" id="nama" name="nama"
                 class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-primary-500 dark:focus:ring-primary-500"
-                placeholder="Bonnie Green" required />
+                placeholder="name" required />
         </div>
 
         <div>
             <label for="email" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
                 Email
             </label>
-            <input type="email" id="email"
+            <input type="email" id="email" name="email"
                 class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-primary-500 dark:focus:ring-primary-500"
                 placeholder="example@example.com" required />
         </div>
@@ -24,7 +24,7 @@
             <label for="phone" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
                 Phone number
             </label>
-            <input type="tel" id="phone"
+            <input type="tel" id="phone" name="phone"
                 class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-primary-500 dark:focus:ring-primary-500"
                 placeholder="08123456789" required />
         </div>
@@ -34,7 +34,7 @@
                 <label for="provinsi" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
                     Provinsi
                 </label>
-                <input type="text" id="provinsi"
+                <input type="text" id="provinsi" name="provinsi"
                     class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-primary-500 dark:focus:ring-primary-500"
                     placeholder="Provinsi" required />
             </div>
@@ -43,7 +43,7 @@
                 <label for="kota" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
                     Kota
                 </label>
-                <input type="text" id="kota"
+                <input type="text" id="kota" name="kota"
                     class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-primary-500 dark:focus:ring-primary-500"
                     placeholder="City Name" required />
             </div>
@@ -52,7 +52,7 @@
                 <label for="kode_pos" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
                     Code pos
                 </label>
-                <input type="text" id="kode_pos"
+                <input type="text" id="kode_pos" name="kode_pos"
                     class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-primary-500 dark:focus:ring-primary-500"
                     placeholder="12345" required />
             </div>
@@ -62,7 +62,7 @@
             <label for="address" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
                 Full Address
             </label>
-            <textarea id="address"
+            <textarea id="address" name="address"
                 class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-primary-500 dark:focus:ring-primary-500"
                 placeholder="Complete Address" rows="3" required></textarea>
         </div>

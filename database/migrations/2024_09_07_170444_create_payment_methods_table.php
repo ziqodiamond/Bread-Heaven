@@ -15,6 +15,8 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('category');
+            $table->string('account_number')->nullable();
+            $table->string('image_url')->nullable();
             $table->decimal('fee', 8, 2)->default(0.00); // Fee untuk payment method
             $table->enum('status', ['available', 'unavailable'])->default('available'); // Status method
             $table->timestamps();

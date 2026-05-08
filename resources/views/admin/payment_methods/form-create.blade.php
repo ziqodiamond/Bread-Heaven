@@ -2,17 +2,29 @@
 <form action="{{ route('payment-methods.store') }}" method="POST" enctype="multipart/form-data">
     @csrf
     <div class="mb-4">
-        <label for="nama" class="block text-gray-700 dark:text-gray-200">Payment Method Name</label>
+        <label for="nama" class="block text-gray-700 dark:text-gray-200">Payment Method Name*</label>
         <input type="text" id="name" name="name"
             class="w-full bg-white border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
             required>
     </div>
 
     <div class="mb-4">
-        <label for="category" class="block text-gray-700 dark:text-gray-200">Category</label>
+        <label for="category" class="block text-gray-700 dark:text-gray-200">Category*</label>
         <input type="text" id="category" name="category"
             class="w-full bg-white border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
             required>
+    </div>
+
+    <div class="mb-4">
+        <label for="account_number" class="block text-gray-700 dark:text-gray-200">Account Number</label>
+        <input type="text" id="account_number" name="account_number"
+            class="w-full bg-white border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+    </div>
+
+    <div class="mb-4">
+        <label for="image_url" class="block text-gray-700 dark:text-gray-200">Image</label>
+        <input type="file" id="image_url" name="image_url"
+            class="w-full bg-white border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white">
     </div>
 
     <div class="mb-4">

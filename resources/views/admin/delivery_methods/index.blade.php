@@ -43,7 +43,7 @@
                     </td>
                     <td class="px-6 py-4 text-right">
                         <a href="#"
-                            onclick="openEditModal({{ $method->id }}, '{{ $method->nama }}', '{{ $method->category }}', '{{ $method->fee }}', '{{ $method->icon }}', '{{ $method->status }}')"
+                            onclick="openEditModal({{ $method->id }}, '{{ $method->name }}', {{ $method->shipping_cost }}, '{{ $method->status }}')"
                             class="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</a>
                         <a href="#" onclick="openDeleteModal({{ $method->id }})"
                             class="font-medium text-red-600 dark:text-red-500 hover:underline">Delete</a>
@@ -76,13 +76,18 @@
     </div>
 @endforeach
 
+
 <!-- Delete Modal -->
 <div id="deleteModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden">
     <div class="bg-white rounded-lg p-6 w-1/3">
-        <h2 class="text-xl font-bold mb-4">Confirm Delete</h2>
-        <p>Are you sure you want to delete this payment method?</p>
-        <button id="confirmDeleteBtn" class="bg-red-500 text-white px-4 py-2 rounded-md">Delete</button>
-        <button onclick="closeDeleteModal()" class="bg-gray-500 text-white px-4 py-2 rounded-md">Cancel</button>
+        <p class="text-lg font-semibold mb-4">Are you sure you want to delete this payment method?</p>
+        <form id="deleteForm" method="POST">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded-md">Delete</button>
+            <button type="button" onclick="closeDeleteModal()"
+                class="bg-gray-500 text-white px-4 py-2 rounded-md">Cancel</button>
+        </form>
     </div>
 </div>
 
@@ -95,14 +100,12 @@
         document.getElementById('createModal').classList.add('hidden');
     }
 
-    function openEditModal(methodId, name, category, fee, icon, status) {
+    function openEditModal(methodId, name, shipping_cost, status) {
         const modal = document.getElementById(`editModal${methodId}`);
         modal.classList.remove('hidden');
 
         document.getElementById(`edit_name${methodId}`).value = name;
-        document.getElementById(`edit_category${methodId}`).value = category;
-        document.getElementById(`edit_fee${methodId}`).value = fee;
-        document.getElementById(`edit_icon${methodId}`).src = icon;
+        document.getElementById(`edit_shipping_cost${methodId}`).value = shipping_cost;
         document.getElementById(`edit_status${methodId}`).value = status;
     }
 
@@ -111,36 +114,14 @@
     }
 
     function openDeleteModal(methodId) {
-        document.getElementById('deleteModal').classList.remove('hidden');
-        document.getElementById('confirmDeleteBtn').setAttribute('data-method-id', methodId);
+        const modal = document.getElementById('deleteModal');
+        modal.classList.remove('hidden');
+
+        const deleteForm = document.getElementById('deleteForm');
+        deleteForm.action = `/admin/delivery-methods/${methodId}`; // Ganti route sesuai dengan route delete produk
     }
 
     function closeDeleteModal() {
         document.getElementById('deleteModal').classList.add('hidden');
-    }
-
-    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
-        const methodId = this.getAttribute('data-method-id');
-        confirmDelete(methodId);
-    });
-
-    function confirmDelete(methodId) {
-        console.log("Deleting method with URL: ", `/admin/delivery-methods/${methodId}`);
-        fetch(`/admin/delivery-methods/${methodId}`, {
-                method: 'DELETE', // Gunakan tanda kurung kurawal di sini
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    window.location.reload(); // Refresh halaman setelah berhasil
-                } else {
-                    alert('Failed to delete the delivery method.');
-                }
-            })
-            .catch(error => console.error('Error:', error));
     }
 </script>

@@ -39,7 +39,7 @@ class ProductController extends Controller
             'status' => 'required|in:available,not available',
             'image_url' => 'required|image|mimes:jpg,png,jpeg,gif,svg|max:2048',
         ]);
-
+        // dd($request);
         // Simpan gambar di direktori product_images
         $imagePath = $request->file('image_url')->store('product_images', 'public');
 
@@ -94,15 +94,11 @@ class ProductController extends Controller
         return redirect()->back()->with('success', 'Product updated successfully.');
     }
 
-    public function destroy(Product $product)
+    public function destroy($id)
     {
-        // Hapus gambar jika ada
-        if ($product->image_url && Storage::exists($product->image_url)) {
-            Storage::delete($product->image_url);
-        }
-
+        $product = Product::findOrFail($id);
         $product->delete();
 
-        return response()->json(['success' => 'Product deleted successfully.']);
+        return redirect()->back()->with('success', 'Product deleted successfully.');
     }
 }

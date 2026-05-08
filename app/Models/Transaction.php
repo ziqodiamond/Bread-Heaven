@@ -11,18 +11,49 @@ class Transaction extends Model
 
 
     protected $fillable = [
-        'product_id',
+        'user_id',
+        'payment_method',   // Added payment_method
+        'delivery_method',
         'customer_name',
         'customer_phone',
         'customer_email',
         'customer_address',
-        'quantity',
         'total_price',
         'status',
+        'payment_status',
     ];
 
-    public function product()
+    /**
+     * Relasi dengan model TransactionDetail.
+     * Setiap transaksi memiliki banyak detail transaksi.
+     */
+    public function details()
     {
-        return $this->belongsTo(Product::class);
+        return $this->hasMany(TransactionDetail::class);
+    }
+
+    /**
+     * Relasi dengan model User.
+     * Setiap transaksi terkait dengan satu user.
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Relasi dengan model PaymentMethod.
+     */
+    public function paymentMethod()
+    {
+        return $this->belongsTo(PaymentMethod::class, 'payment_method');
+    }
+
+    /**
+     * Relasi dengan model DeliveryMethod.
+     */
+    public function deliveryMethod()
+    {
+        return $this->belongsTo(DeliveryMethod::class, 'delivery_method');
     }
 }

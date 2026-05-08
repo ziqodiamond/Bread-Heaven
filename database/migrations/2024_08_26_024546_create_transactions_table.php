@@ -13,17 +13,17 @@ return new class extends Migration
     {
         Schema::create('transactions', function (Blueprint $table) {
             $table->bigIncrements('id');
-            $table->unsignedBigInteger('product_id');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->string('payment_method');
+            $table->string('delivery_method');
             $table->string('customer_name');
             $table->string('customer_phone');
             $table->string('customer_email');
             $table->text('customer_address');
-            $table->unsignedInteger('quantity');
             $table->decimal('total_price', 10, 2);
-            $table->enum('status', ['pending', 'proses', 'dikirim', 'selesai'])->default('pending');
+            $table->enum('status', ['pending', 'process', 'shipped', 'completed', 'canceled'])->default('pending');
+            $table->enum('payment_status', ['unpaid', 'paid', 'failed'])->default('unpaid');
             $table->timestamps();
-
-            $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
         });
     }
 

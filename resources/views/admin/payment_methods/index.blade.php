@@ -38,6 +38,7 @@
             <tr>
                 <th scope="col" class="px-6 py-3">Name</th>
                 <th scope="col" class="px-6 py-3">Category</th>
+                <th scope="col" class="px-6 py-3">Account Number</th>
                 <th scope="col" class="px-6 py-3">Fee</th>
                 <th scope="col" class="px-6 py-3">Status</th>
                 <th scope="col" class="px-6 py-3">Actions</th>
@@ -49,6 +50,7 @@
                     <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
                         {{ $method->name }}</td>
                     <td class="px-6 py-4">{{ $method->category }}</td>
+                    <td class="px-6 py-4">{{ $method->account_number }}</td>
                     <td class="px-6 py-4">Rp {{ number_format($method->fee, 0, ',', '.') }}</td>
                     <td class="px-6 py-4">
                         <span
@@ -58,7 +60,7 @@
                     </td>
                     <td class="px-6 py-4 text-right">
                         <a href="#"
-                            onclick="openEditModal({{ $method->id }}, '{{ $method->nama }}', '{{ $method->category }}', '{{ $method->fee }}', '{{ $method->icon }}', '{{ $method->status }}')"
+                            onclick="openEditModal({{ $method->id }}, '{{ $method->name }}', '{{ $method->category }}', '{{ $method->account_number }}', '{{ $method->fee }}', '{{ $method->icon }}', '{{ $method->status }}')"
                             class="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</a>
                         <a href="#" onclick="openDeleteModal({{ $method->id }})"
                             class="font-medium text-red-600 dark:text-red-500 hover:underline">Delete</a>
@@ -94,10 +96,14 @@
 <!-- Delete Modal -->
 <div id="deleteModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden">
     <div class="bg-white rounded-lg p-6 w-1/3">
-        <h2 class="text-xl font-bold mb-4">Confirm Delete</h2>
-        <p>Are you sure you want to delete this payment method?</p>
-        <button id="confirmDeleteBtn" class="bg-red-500 text-white px-4 py-2 rounded-md">Delete</button>
-        <button onclick="closeDeleteModal()" class="bg-gray-500 text-white px-4 py-2 rounded-md">Cancel</button>
+        <p class="text-lg font-semibold mb-4">Are you sure you want to delete this payment method?</p>
+        <form id="deleteForm" method="POST">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded-md">Delete</button>
+            <button type="button" onclick="closeDeleteModal()"
+                class="bg-gray-500 text-white px-4 py-2 rounded-md">Cancel</button>
+        </form>
     </div>
 </div>
 
@@ -110,15 +116,41 @@
         document.getElementById('createModal').classList.add('hidden');
     }
 
-    function openEditModal(methodId, name, category, fee, icon, status) {
+    function openEditModal(methodId, name, category, accountNumber, fee, imageUrl, status) {
         const modal = document.getElementById(`editModal${methodId}`);
         modal.classList.remove('hidden');
 
+        // Update form fields with the current values
         document.getElementById(`edit_name${methodId}`).value = name;
         document.getElementById(`edit_category${methodId}`).value = category;
+        document.getElementById(`edit_account_number${methodId}`).value = accountNumber;
         document.getElementById(`edit_fee${methodId}`).value = fee;
-        document.getElementById(`edit_icon${methodId}`).src = icon;
         document.getElementById(`edit_status${methodId}`).value = status;
+
+        // Update the image preview
+        const imagePreview = document.getElementById(`edit_image_preview${methodId}`);
+        if (imageUrl) {
+            imagePreview.src = imageUrl;
+            imagePreview.classList.remove('hidden'); // Show the image if it exists
+        } else {
+            imagePreview.classList.add('hidden'); // Hide the image if there's none
+        }
+
+        // Handle the image input change to preview new image before upload
+        const imageInput = document.getElementById(`edit_image_url${methodId}`);
+        imageInput.addEventListener('change', function() {
+            const file = imageInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.src = e.target.result;
+                    imagePreview.classList.remove('hidden'); // Show the new image
+                };
+                reader.readAsDataURL(file);
+            } else {
+                imagePreview.classList.add('hidden'); // Hide if no image selected
+            }
+        });
     }
 
     function closeEditModal(methodId) {
@@ -126,9 +158,13 @@
     }
 
     function openDeleteModal(methodId) {
-        document.getElementById('deleteModal').classList.remove('hidden');
-        document.getElementById('confirmDeleteBtn').setAttribute('data-method-id', methodId);
+        const modal = document.getElementById('deleteModal');
+        modal.classList.remove('hidden');
+
+        const deleteForm = document.getElementById('deleteForm');
+        deleteForm.action = `/admin/payment-methods/${methodId}`; // Ganti route sesuai dengan route delete produk
     }
+
 
     function closeDeleteModal() {
         document.getElementById('deleteModal').classList.add('hidden');
@@ -140,19 +176,20 @@
     });
 
     function confirmDelete(methodId) {
-        console.log("Deleting method with URL: ", `/admin/payment_methods/${methodId}`);
-        fetch(`/admin/payment_methods/${methodId}`, {
+        fetch(`admin/payment-methods/${methodId}`, {
                 method: 'DELETE',
                 headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Content-Type': 'application/json',
                 }
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    window.location.reload();
+            .then(response => {
+                if (response.ok) {
+                    window.location.reload(); // Refresh page after successful deletion
                 } else {
-                    alert('Failed to delete the payment method.');
+                    return response.json().then(errorData => {
+                        alert('Failed to delete the payment method: ' + errorData.message);
+                    });
                 }
             })
             .catch(error => console.error('Error:', error));
