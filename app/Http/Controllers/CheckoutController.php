@@ -4,27 +4,168 @@ namespace App\Http\Controllers;
 
 use App\Models\Cart;
 use App\Models\CartItem;
-use App\Models\Transaction;
-use Illuminate\Http\Request;
-use App\Models\PaymentMethod;
 use App\Models\DeliveryMethod;
+use App\Models\PaymentMethod;
+use App\Models\Product;
+use App\Models\Transaction;
 use App\Models\TransactionDetail;
+use Illuminate\Http\Request;
 
 class CheckoutController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $user = auth()->user(); // Mengambil data user yang sedang login
-        $cart = Cart::where('user_id', $user->id)->first();
-        $cartItems = CartItem::where('cart_id', $cart->id)->get();
-        $totalPrice = $cartItems->sum(function ($item) {
-            return $item->product->price * $item->quantity;
-        });
+        $user = auth()->user();
 
-        $deliveryMethods = DeliveryMethod::where('status', 'available')->get();
-        $paymentMethods = PaymentMethod::where('status', 'available')->get();
+        /*
+    |--------------------------------------------------------------------------
+    | BUY NOW MODE
+    |--------------------------------------------------------------------------
+    */
 
-        return view('checkout', compact('cartItems', 'totalPrice', 'deliveryMethods', 'paymentMethods'));
+        if ($request->mode === 'buy_now') {
+
+            $product = Product::with('primaryImage')
+                ->findOrFail($request->product_id);
+
+            $quantity =
+                max(1, (int) $request->quantity);
+
+            abort_if(
+                !$product->hasEnoughStock($quantity),
+                404
+            );
+
+            $items = collect([
+                (object) [
+
+                    'product' => $product,
+
+                    'quantity' => $quantity,
+
+                    'price' => $product->price,
+
+                    'subtotal' =>
+                    $product->price * $quantity,
+
+                    'total_weight' =>
+                    $product->weight * $quantity,
+
+                    /*
+        |--------------------------------------------------------------------------
+        | Compatibility checkout view
+        |--------------------------------------------------------------------------
+        */
+
+                    'product_name' =>
+                    $product->name,
+
+                    'product_image_url' =>
+                    $product->thumbnail,
+
+                    'product_price' =>
+                    $product->price,
+                ]
+            ]);
+
+            $cart = (object) [
+                'items' => $items,
+            ];
+
+            $subtotal =
+                $items->sum('subtotal');
+
+            $totalWeight =
+                $items->sum('total_weight');
+
+            $checkoutMode = 'buy_now';
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | CART NORMAL
+    |--------------------------------------------------------------------------
+    */ else {
+
+            $cart = $user->cart()
+                ->with([
+                    'items.product.primaryImage'
+                ])
+                ->first();
+
+            abort_if(
+                !$cart || $cart->items->isEmpty(),
+                404
+            );
+
+            $subtotal =
+                $cart->items->sum('subtotal');
+
+            $totalWeight =
+                $cart->items->sum('total_weight');
+
+            $checkoutMode = 'cart';
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Alamat
+    |--------------------------------------------------------------------------
+    */
+
+        $addresses = $user->addresses()
+            ->active()
+            ->get();
+
+        /*
+    |--------------------------------------------------------------------------
+    | Payment
+    |--------------------------------------------------------------------------
+    */
+
+        $paymentMethods = PaymentMethod::available()
+            ->get();
+
+        return view('checkout.index', compact(
+            'cart',
+            'addresses',
+            'paymentMethods',
+            'subtotal',
+            'totalWeight',
+            'checkoutMode'
+        ));
+    }
+
+    public function buyNow(Request $request)
+    {
+        $validated = $request->validate([
+
+            'product_id' => [
+                'required',
+                'exists:products,id',
+            ],
+
+            'quantity' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+
+        ]);
+
+        return redirect()->route(
+            'checkout.index',
+            [
+
+                'mode' => 'buy_now',
+
+                'product_id' =>
+                $validated['product_id'],
+
+                'quantity' =>
+                $validated['quantity'],
+            ]
+        );
     }
 
     public function proceed(Request $request)

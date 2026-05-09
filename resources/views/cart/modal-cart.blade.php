@@ -19,8 +19,8 @@
                             <div class="flex items-center gap-4">
                                 @if ($item->product)
                                     <!-- Menampilkan gambar produk jika ada -->
-                                    <img src="{{ asset('storage/' . $item->product->image_url) }}"
-                                        alt="{{ $item->product->name }}" class="size-16 rounded object-cover" />
+                                    <img src="{{ $item->product->thumbnail }}" alt="{{ $item->product->name }}"
+                                        class="size-16 rounded object-cover" />
                                 @else
                                     <!-- Menampilkan gambar default jika produk tidak ada -->
                                     <img src="{{ asset('images/default-product.jpg') }}" alt="Default Image"

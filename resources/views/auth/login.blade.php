@@ -1,72 +1,86 @@
 <x-guest-layout>
-    <!-- Session Status -->
+
+    {{-- Header --}}
+    <div class="mb-8">
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-white">
+            Masuk
+        </h2>
+
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Silakan masuk ke akun Anda
+        </p>
+    </div>
+
+    {{-- Session Status --}}
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
-    <form method="POST" action="{{ route('login') }}">
+    <form method="POST" action="{{ route('login') }}" class="space-y-5">
+
         @csrf
 
-        <!-- Email Address & Username -->
+        {{-- Email / Username --}}
         <div>
-            <x-input-label for="id_user" :value="__('Email or Phone Number')" />
-            <x-text-input id="id_user" class="block mt-1 w-full" type="text" name="id_user" :value="old('id_user')" required
-                autofocus autocomplete="id_user" />
-
-        </div>
-
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
-
-            <x-text-input id="password" class="block mt-1 w-full" type="password" name="password" required
-                autocomplete="current-password" />
-
-
-        </div>
-
-        <!-- Remember Me -->
-        <div class="block mt-4">
-            <label for="remember_me" class="inline-flex items-center">
-                <input id="remember_me" type="checkbox"
-                    class="rounded dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800"
-                    name="remember">
-                <span class="ms-2 text-sm text-gray-600 dark:text-gray-400">{{ __('Remember me') }}</span>
+            <label for="id_user" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Email atau Kode Pengguna
             </label>
+
+            <input id="id_user" type="text" name="id_user" value="{{ old('id_user') }}" required autofocus
+                autocomplete="username" placeholder="Masukkan email atau kode pengguna"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500">
         </div>
 
-        <!-- Display Authentication Errors -->
-        @if ($errors->any())
-            <div class="mt-4">
-                <div class="font-medium text-red-600">
-                    {{ __('Whoops! Something went wrong.') }}
-                </div>
+        {{-- Password --}}
+        <div>
+            <label for="password" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Password
+            </label>
 
-                <ul class="mt-3 list-disc list-inside text-sm text-red-600">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+            <input id="password" type="password" name="password" required autocomplete="current-password"
+                placeholder="Masukkan password"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500">
+        </div>
+
+        {{-- Remember Me + Forgot Password --}}
+        <div class="flex items-center justify-between">
+
+            {{-- Remember Me --}}
+            <label class="flex items-center gap-2">
+                <input type="checkbox" name="remember"
+                    class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800">
+
+                <span class="text-sm text-gray-600 dark:text-gray-400">
+                    Ingat saya
+                </span>
+            </label>
+
+            {{-- Forgot Password --}}
+            @if (Route::has('password.request'))
+                <a href="{{ route('password.request') }}" class="text-sm font-medium text-blue-600 hover:text-blue-700">
+                    Lupa password?
+                </a>
+            @endif
+
+        </div>
+
+        {{-- Tombol Login --}}
+        <button type="submit"
+            class="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white py-3 font-medium transition duration-200">
+            Masuk
+        </button>
+        {{-- Register --}}
+        @if (Route::has('register'))
+            <div class="text-center pt-2">
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Belum punya akun?
+
+                    <a href="{{ route('register') }}"
+                        class="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                        Daftar sekarang
+                    </a>
+                </p>
             </div>
         @endif
 
-        <div class="flex items-center justify-between mt-4">
-            <div>
-                <a class="hover:underline text-sm text-gray-600 hover:text-blue-500 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    href="{{ route('register') }}">
-                    {{ __('Don\'t have an account?') }}
-                </a>
-                @if (Route::has('password.request'))
-                    <div class="mt-2">
-                        <a class="hover:underline text-sm text-gray-600 hover:text-blue-500 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            href="{{ route('password.request') }}">
-                            {{ __('Forgot your password?') }}
-                        </a>
-                    </div>
-                @endif
-            </div>
-
-            <x-primary-button class="ms-3">
-                {{ __('Log in') }}
-            </x-primary-button>
-        </div>
     </form>
+
 </x-guest-layout>

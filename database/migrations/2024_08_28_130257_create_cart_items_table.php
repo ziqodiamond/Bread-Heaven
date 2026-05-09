@@ -11,11 +11,59 @@ return new class extends Migration
      */
     public function up(): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Cart Items Table
+        |--------------------------------------------------------------------------
+        | Menyimpan item produk di dalam cart
+        |--------------------------------------------------------------------------
+        */
         Schema::create('cart_items', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('cart_id')->constrained()->onDelete('cascade');
-            $table->foreignId('product_id')->constrained()->onDelete('cascade');
-            $table->integer('quantity');
+
+            // Primary UUID
+            $table->uuid('id')->primary();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Relasi
+            |--------------------------------------------------------------------------
+            */
+
+            // Relasi ke cart
+            $table->foreignUuid('cart_id')
+                ->constrained('carts')
+                ->cascadeOnDelete();
+
+            // Relasi ke produk
+            $table->foreignUuid('product_id')
+                ->constrained('products')
+                ->cascadeOnDelete();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Quantity & Subtotal
+            |--------------------------------------------------------------------------
+            */
+
+            // Jumlah produk
+            $table->unsignedInteger('quantity')->default(1);
+
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Unique Constraint
+            |--------------------------------------------------------------------------
+            | Mencegah produk duplicate dalam satu cart
+            |--------------------------------------------------------------------------
+            */
+
+            $table->unique([
+                'cart_id',
+                'product_id'
+            ]);
+
             $table->timestamps();
         });
     }

@@ -1,39 +1,68 @@
 <x-guest-layout>
-    <form method="POST" action="{{ route('password.store') }}">
+
+    {{-- Header --}}
+    <div class="mb-8">
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-white">
+            Reset Password
+        </h2>
+
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Masukkan password baru untuk akun Anda
+        </p>
+    </div>
+
+    <form method="POST" action="{{ route('password.store') }}" class="space-y-5">
+
         @csrf
 
-        <!-- Password Reset Token -->
+        {{-- Token Reset Password --}}
         <input type="hidden" name="token" value="{{ $request->route('token') }}">
 
-        <!-- Email Address -->
+        {{-- Email --}}
         <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email', $request->email)" required autofocus autocomplete="username" />
+            <label for="email" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Email
+            </label>
+
+            <input id="email" type="email" name="email" value="{{ old('email', $request->email) }}" required
+                autofocus autocomplete="username" placeholder="Masukkan email"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500">
+
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
 
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
-            <x-text-input id="password" class="block mt-1 w-full" type="password" name="password" required autocomplete="new-password" />
+        {{-- Password Baru --}}
+        <div>
+            <label for="password" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Password Baru
+            </label>
+
+            <input id="password" type="password" name="password" required autocomplete="new-password"
+                placeholder="Masukkan password baru"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500">
+
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
-        <!-- Confirm Password -->
-        <div class="mt-4">
-            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
+        {{-- Konfirmasi Password --}}
+        <div>
+            <label for="password_confirmation" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Konfirmasi Password
+            </label>
 
-            <x-text-input id="password_confirmation" class="block mt-1 w-full"
-                                type="password"
-                                name="password_confirmation" required autocomplete="new-password" />
+            <input id="password_confirmation" type="password" name="password_confirmation" required
+                autocomplete="new-password" placeholder="Ulangi password baru"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500">
 
             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
         </div>
 
-        <div class="flex items-center justify-end mt-4">
-            <x-primary-button>
-                {{ __('Reset Password') }}
-            </x-primary-button>
-        </div>
+        {{-- Tombol Reset --}}
+        <button type="submit"
+            class="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white py-3 font-medium transition duration-200">
+            Reset Password
+        </button>
+
     </form>
+
 </x-guest-layout>

@@ -11,16 +11,85 @@ return new class extends Migration
      */
     public function up(): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Products Table
+        |--------------------------------------------------------------------------
+        | Menyimpan data produk toko
+        |--------------------------------------------------------------------------
+        */
         Schema::create('products', function (Blueprint $table) {
-            $table->id();
+
+            // Primary UUID
+            $table->uuid('id')->primary();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Informasi Produk
+            |--------------------------------------------------------------------------
+            */
+
+            // Nama produk
             $table->string('name');
+
+            // Slug SEO friendly
+            $table->string('slug')->unique();
+
+            // SKU produk
+            $table->string('sku')->unique();
+
+            // Kategori produk
             $table->string('category');
-            $table->text('description')->nullable();
-            $table->decimal('price', 10, 2);
-            $table->unsignedInteger('stock');
-            $table->enum('status', ['available', 'not available']);
-            $table->string('image_url')->nullable();
+
+            // Deskripsi produk
+            $table->longText('description')->nullable();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Harga & Stok
+            |--------------------------------------------------------------------------
+            | Menggunakan bigint agar aman untuk sistem transaksi
+            |--------------------------------------------------------------------------
+            */
+
+            // Harga produk dalam rupiah
+            // Contoh:
+            // 150000 = Rp150.000
+            $table->bigInteger('price');
+
+            // Stok produk
+            $table->unsignedInteger('stock')->default(0);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Informasi Shipping
+            |--------------------------------------------------------------------------
+            | Dibutuhkan untuk cek ongkir Biteship/RajaOngkir
+            |--------------------------------------------------------------------------
+            */
+
+            // Berat produk dalam gram
+            $table->unsignedInteger('weight')->default(0);
+
+            // Dimensi produk (opsional)
+            $table->unsignedInteger('length')->nullable();
+            $table->unsignedInteger('width')->nullable();
+            $table->unsignedInteger('height')->nullable();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Status Produk
+            |--------------------------------------------------------------------------
+            */
+
+            $table->enum('status', [
+                'available',
+                'not_available'
+            ])->default('available');
+
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

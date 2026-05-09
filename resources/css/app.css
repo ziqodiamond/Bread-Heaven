@@ -1,3 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@plugin "@tailwindcss/forms";
+@plugin "flowbite/plugin";
+@plugin "daisyui";
+
+@theme {
+    --font-sans: "Figtree", sans-serif;
+}

@@ -9,39 +9,25 @@ use Illuminate\Http\Request;
 
 class CartController extends Controller
 {
+    /**
+     * Halaman cart
+     */
     public function index()
     {
-        // Mengambil cart berdasarkan user yang sedang login
-        $cart = Cart::where('user_id', auth()->id())
-            ->with('items.product') // Memuat relasi items dan produk terkait
+        $cart = Cart::with('items.product')
             ->firstOrCreate([
                 'user_id' => auth()->id(),
             ]);
 
-        // Menghitung total harga dari cart
-        $totalPrice = $cart->items->sum(function ($item) {
-            return $item->product->price * $item->quantity;
-        });
-
-        // Menghitung total harga sebelum diskon, pajak, dan biaya pengiriman
-        $originalPrice = $totalPrice + 299; // Contoh diskon sebesar $299
-
-        // Simpan data untuk tampilan
-        return view('cart.index', [
-            'cart' => $cart,
-            'totalPrice' => $totalPrice,
-            'originalPrice' => $originalPrice,
-            'savings' => 299, // Contoh nilai diskon
-            'tax' => 799, // Contoh nilai pajak
-            'pickupFee' => 99 // Contoh biaya pengiriman
-        ]);
+        return view('cart.index', compact('cart'));
     }
 
-
+    /**
+     * Modal cart
+     */
     public function show()
     {
-        $cart = Cart::where('user_id', auth()->id())
-            ->with('items.product') // Memuat relasi items dan produk terkait
+        $cart = Cart::with('items.product')
             ->firstOrCreate([
                 'user_id' => auth()->id(),
             ]);
@@ -49,43 +35,114 @@ class CartController extends Controller
         return view('cart.modal-cart', compact('cart'));
     }
 
-
-
+    /**
+     * Tambah produk ke cart
+     */
     public function add(Request $request)
     {
-        $productId = $request->input('product_id');
-        $product = Product::findOrFail($productId);
+        // Ambil produk
+        $product = Product::available()
+            ->inStock()
+            ->findOrFail($request->product_id);
 
-        // Temukan atau buat cart untuk user yang sedang login
+        // Cari / buat cart user
         $cart = Cart::firstOrCreate([
             'user_id' => auth()->id(),
+        ], [
+            'status' => 'active',
         ]);
 
-        // Tambahkan produk ke cart
-        $cart->items()->create([
-            'product_id' => $productId,
-            'quantity' => 1, // Set jumlah item, bisa ditingkatkan sesuai kebutuhan
-        ]);
+        // Cek apakah produk sudah ada di cart
+        $cartItem = $cart->items()
+            ->where('product_id', $product->id)
+            ->first();
 
-        return redirect()->back()->with('success', 'Product added to cart successfully.');
-    }
-
-    public function update(Request $request, CartItem $cartItem)
-    {
-        $cartItem->update(['quantity' => $request->quantity]);
-
-        return redirect()->back()->with('success', 'Cart updated successfully!');
-    }
-
-    public function removeItem($id)
-    {
-        $cartItem = CartItem::find($id);
-
+        /*
+        |--------------------------------------------------------------------------
+        | Jika produk sudah ada
+        |--------------------------------------------------------------------------
+        */
         if ($cartItem) {
-            $cartItem->delete();
-            return redirect()->back()->with('success', 'Item has been removed from the cart.');
+
+            $newQuantity = $cartItem->quantity + 1;
+
+            // Validasi stok
+            if (!$product->hasEnoughStock($newQuantity)) {
+
+                return back()->with(
+                    'error',
+                    'Stok produk tidak mencukupi.'
+                );
+            }
+
+            // Update quantity
+            $cartItem->updateQuantity($newQuantity);
         }
 
-        return redirect()->back()->with('error', 'Item not found.');
+        /*
+        |--------------------------------------------------------------------------
+        | Jika produk belum ada
+        |--------------------------------------------------------------------------
+        */ else {
+
+            $cart->items()->create([
+
+                'product_id' => $product->id,
+
+                'quantity' => 1,
+            ]);
+        }
+
+        // Refresh summary cart
+        $cart->refreshCartSummary();
+
+        return back()->with(
+            'success',
+            'Produk berhasil ditambahkan ke cart.'
+        );
+    }
+
+    /**
+     * Update quantity cart item
+     */
+    public function update(Request $request, CartItem $cartItem)
+    {
+        $request->validate([
+            'quantity' => ['required', 'integer', 'min:1']
+        ]);
+
+        $product = $cartItem->product;
+
+        // Validasi stok
+        if (!$product->hasEnoughStock($request->quantity)) {
+
+            return back()->with(
+                'error',
+                'Stok produk tidak mencukupi.'
+            );
+        }
+
+        // Update quantity
+        $cartItem->updateQuantity($request->quantity);
+
+        return back()->with(
+            'success',
+            'Cart berhasil diperbarui.'
+        );
+    }
+
+    /**
+     * Hapus item cart
+     */
+    public function removeItem(string $id)
+    {
+        $cartItem = CartItem::findOrFail($id);
+
+        $cartItem->delete();
+
+        return back()->with(
+            'success',
+            'Item berhasil dihapus dari cart.'
+        );
     }
 }

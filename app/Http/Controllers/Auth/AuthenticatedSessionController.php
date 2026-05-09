@@ -28,9 +28,17 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        // Ambil user login
+        $user = Auth::user();
+
+        // Jika email belum diverifikasi
+        if (! $user->hasVerifiedEmail()) {
+
+            return redirect()->route('verification.notice');
+        }
+
         return redirect()->intended(route('home', absolute: false));
     }
-
     /**
      * Destroy an authenticated session.
      */

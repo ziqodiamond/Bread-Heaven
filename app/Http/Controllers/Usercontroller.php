@@ -11,14 +11,14 @@ class Usercontroller extends Controller
     public function index()
     {
         $users = User::all();
-        return view('admin.users', compact('users'));
+        return view('admin.management.users.index', compact('users'));
     }
 
     // Menampilkan halaman edit pengguna
     public function edit($id)
     {
         $user = User::findOrFail($id);
-        return view('admin.users.edit', compact('user'));
+        return view('admin.management.users.partials.edit', compact('user'));
     }
 
     // Memperbarui data pengguna

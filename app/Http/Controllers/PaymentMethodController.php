@@ -25,12 +25,12 @@ class PaymentMethodController extends Controller
             })
             ->get();
 
-        return view('admin.payment', compact('paymentMethods', 'categories', 'statuses'));
+        return view('admin.management.payment_methods.index', compact('paymentMethods', 'categories', 'statuses'));
     }
 
     public function create()
     {
-        return view('admin.payment');
+        return view('admin.management.payment_methods.create');
     }
 
     public function store(Request $request)
@@ -59,7 +59,7 @@ class PaymentMethodController extends Controller
     {
         $paymentMethod = PaymentMethod::findOrFail($id);
 
-        return view('admin.payment_methods.form-edit', compact('paymentMethod'));
+        return view('admin.management.payment_methods.form-edit', compact('paymentMethod'));
     }
 
 

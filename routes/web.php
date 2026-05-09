@@ -1,18 +1,23 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\CartController;
-use App\Http\Controllers\Usercontroller;
-use App\Http\Middleware\AdminMiddleware;
+use App\Http\Controllers\AddressController;
+use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\CartController;
+use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\DeliveryMethodController;
 use App\Http\Controllers\GeneralController;
+use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\ShippingMethodController;
 use App\Http\Controllers\TransactionController;
-use App\Http\Controllers\PaymentMethodController;
-use App\Http\Controllers\DeliveryMethodController;
+use App\Http\Controllers\Usercontroller;
+use App\Http\Middleware\AdminMiddleware;
+use Illuminate\Support\Facades\Route;
 
+
+//PUBLIC ROUTES
 Route::prefix('/')->group(function () {
     // Home page
     Route::get('/', [GeneralController::class, 'index'])->name('home');
@@ -20,75 +25,106 @@ Route::prefix('/')->group(function () {
     Route::get('/product/{id}', [GeneralController::class, 'show'])->name('product.show');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
-
-Route::prefix('admin')->group(function () {
-    // dashboard page
-    Route::get('/', [AdminController::class, 'index'])->name('admin.dashboard');
-    Route::get('/products', [ProductController::class, 'index'])->name('admin.products');
-    Route::get('/products', [ProductController::class, 'index'])->name('products.index');
-    Route::post('/products', [ProductController::class, 'store'])->name('products.store');
-    Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
-    Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
-    Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
-
-    // Route to list all payment methods
-    Route::get('/payment-methods', [PaymentMethodController::class, 'index'])->name('payment-methods.index');
-    // Route to show the form to create a new payment method
-    Route::get('/payment-methods/create', [PaymentMethodController::class, 'create'])->name('payment-methods.create');
-    // Route to store a newly created payment method
-    Route::post('/payment-methods', [PaymentMethodController::class, 'store'])->name('payment-methods.store');
-    // Route to show the form to edit an existing payment method
-    Route::get('/payment-methods/{paymentMethod}/edit', [PaymentMethodController::class, 'edit'])->name('payment-methods.edit');
-    // Route to update an existing payment method
-    Route::put('/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('payment-methods.update');
-    // Route to delete an existing payment method
-    Route::delete('/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'destroy'])->name('payment-methods.destroy');
-
-
-    // Route to list all payment methods
-    Route::get('/delivery-methods', [DeliveryMethodController::class, 'index'])->name('delivery-methods.index');
-    // Route to show the form to create a new payment method
-    Route::get('/delivery-methods/create', [DeliveryMethodController::class, 'create'])->name('delivery-methods.create');
-    // Route to store a newly created payment method
-    Route::post('/delivery-methods', [DeliveryMethodController::class, 'store'])->name('delivery-methods.store');
-    // Route to show the form to edit an existing payment method
-    Route::get('/delivery-methods/{paymentMethod}/edit', [DeliveryMethodController::class, 'edit'])->name('delivery-methods.edit');
-    // Route to update an existing payment method
-    Route::put('/delivery-methods/{paymentMethod}', [DeliveryMethodController::class, 'update'])->name('delivery-methods.update');
-    // Route to delete an existing payment method
-    Route::delete('/delivery-methods/{deliveryMethod}', [DeliveryMethodController::class, 'destroy'])->name('delivery-methods.destroy');
-
-    Route::get('/transactions', [TransactionController::class, 'index'])->name('transaction.index');
-    Route::get('/transactions/{id}/edit', [TransactionController::class, 'edit'])->name('transaction.edit');
-    Route::get('/transactions/{id}/cancel', [TransactionController::class, 'cancel'])->name('transaction.cancel');
-    Route::get('/transactions/{id}/accept', [TransactionController::class, 'accept'])->name('transaction.accept');
-    Route::get('/transactions/{id}/ship', [TransactionController::class, 'ship'])->name('transaction.ship');
-    Route::get('/transactions/{id}/complete', [TransactionController::class, 'complete'])->name('transaction.complete');
-    Route::delete('/transactions/{id}', [TransactionController::class, 'destroy'])->name('transaction.destroy');
-
-    Route::get('/users', [Usercontroller::class, 'index'])->name('admin.users.index');
-    Route::get('/users/{id}/edit', [Usercontroller::class, 'edit'])->name('admin.users.edit');
-    Route::put('/users/{id}', [Usercontroller::class, 'update'])->name('admin.users.update');
-    Route::delete('/users/{id}', [Usercontroller::class, 'destroy'])->name('admin.users.destroy');
-    Route::put('/users/{id}/promote', [Usercontroller::class, 'promote'])->name('admin.users.promote');
-})->middleware(AdminMiddleware::class);;
-
+// AUTH ROUTES
 Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
-    Route::get('/cart/show', [CartController::class, 'show'])->name('cart.show');
-    Route::get('/cart/add', [CartController::class, 'add'])->name('cart.add');
-    Route::put('/cart/update/{cartItem}', [CartController::class, 'update'])->name('cart.update');
-    Route::delete('/cart/remove/{cartItem}', [CartController::class, 'removeItem'])->name('cart.remove');
-    Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
-    Route::post('/checkout/proceed', [CheckoutController::class, 'proceed'])->name('checkout.proceed');
-    Route::get('/transaction/history', [TransactionController::class, 'history'])->name('transaction.history');
-    Route::get('/transaction/{id}', [TransactionController::class, 'show'])->name('transaction.show');
+    Route::prefix('/profile')->name('profile.')->group(function () {
+        Route::get('/', [ProfileController::class, 'edit'])->name('edit');
+        Route::patch('/', [ProfileController::class, 'update'])->name('update');
+        Route::delete('/', [ProfileController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('/address')->name('address.')->group(function () {
+        Route::get('/', [AddressController::class, 'index'])->name('index');
+        Route::get('/create', [AddressController::class, 'create'])->name('create');
+        Route::post('/', [AddressController::class, 'store'])->name('store');
+        Route::get('/{address}/edit', [AddressController::class, 'edit'])->name('edit');
+        Route::put('/{address}', [AddressController::class, 'update'])->name('update');
+        Route::delete('/{address}', [AddressController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('/cart')->name('cart.')->group(function () {
+        Route::get('/', [CartController::class, 'index'])->name('index');
+        Route::get('/show', [CartController::class, 'show'])->name('show');
+        Route::post('/add', [CartController::class, 'add'])->name('add');
+        Route::put('/update/{cartItem}', [CartController::class, 'update'])->name('update');
+        Route::delete('/remove/{cartItem}', [CartController::class, 'removeItem'])->name('remove');
+    });
+
+    Route::prefix('/checkout')->name('checkout.')->group(function () {
+        Route::get('/', [CheckoutController::class, 'index'])->name('index');
+        Route::post('/buy-now', [CheckoutController::class, 'buyNow'])->name('buy-now');
+        Route::post('/', [CheckoutController::class, 'proceed'])->name('store');
+        Route::post('/shipping-rates', [CheckoutController::class, 'shippingRates'])->name('shipping-rates');
+    });
+
+    Route::prefix('/transaction')->name('transaction.')->group(function () {
+        Route::get('/history', [TransactionController::class, 'history'])->name('history');
+        Route::get('/{id}', [TransactionController::class, 'show'])->name('show');
+    });
 });
+
+
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:admin,super_admin'])->group(function () {
+    // dashboard page
+    Route::get('/', [AdminController::class, 'index'])->name('dashboard');
+
+    Route::prefix('management')->name('management.')->group(function () {
+
+        Route::prefix('products')->name('products.')->group(function () {
+            Route::get('/', [ProductController::class, 'index'])->name('index');
+            Route::post('/', [ProductController::class, 'store'])->name('store');
+            Route::get('/{product}/edit', [ProductController::class, 'edit'])->name('edit');
+            Route::put('/{product}', [ProductController::class, 'update'])->name('update');
+            Route::delete('/{product}', [ProductController::class, 'destroy'])->name('destroy');
+        });
+
+        Route::prefix('users')->name('users.')->group(function () {
+            Route::get('/users', [Usercontroller::class, 'index'])->name('index');
+            Route::get('/users/{id}/edit', [Usercontroller::class, 'edit'])->name('edit');
+            Route::put('/users/{id}', [Usercontroller::class, 'update'])->name('update');
+            Route::delete('/users/{id}', [Usercontroller::class, 'destroy'])->name('destroy');
+            Route::put('/users/{id}/promote', [Usercontroller::class, 'promote'])->name('promote');
+        });
+
+        Route::prefix('payment-methods')->name('payment-methods.')->group(function () {
+            Route::get('/', [PaymentMethodController::class, 'index'])->name('index');
+            Route::get('/create', [PaymentMethodController::class, 'create'])->name('create');
+            Route::post('/', [PaymentMethodController::class, 'store'])->name('store');
+            Route::get('/{paymentMethod}/edit', [PaymentMethodController::class, 'edit'])->name('edit');
+            Route::put('/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('update');
+            Route::delete('/{paymentMethod}', [PaymentMethodController::class, 'destroy'])->name('destroy');
+        });
+
+        Route::prefix('shipping-methods')->name('shipping-methods.')->group(function () {
+            Route::get('/', [ShippingMethodController::class, 'index'])->name('index');
+            Route::get('/create', [ShippingMethodController::class, 'create'])->name('create');
+            Route::post('/', [ShippingMethodController::class, 'store'])->name('store');
+            Route::get('/{shippingMethod}/edit', [ShippingMethodController::class, 'edit'])->name('edit');
+            Route::put('/{shippingMethod}', [ShippingMethodController::class, 'update'])->name('update');
+            Route::delete('/{shippingMethod}', [ShippingMethodController::class, 'destroy'])->name('destroy');
+        });
+
+        Route::prefix('stores')->name('stores.')->group(function () {
+            Route::get('/', [StoreController::class, 'index'])->name('index');
+            Route::get('/create', [StoreController::class, 'create'])->name('create');
+            Route::post('/', [StoreController::class, 'store'])->name('store');
+            Route::get('/{store}/edit', [StoreController::class, 'edit'])->name('edit');
+            Route::put('/{store}', [StoreController::class, 'update'])->name('update');
+            Route::delete('/{store}', [StoreController::class, 'destroy'])->name('destroy');
+        });
+    });
+
+    Route::prefix('transactions')->name('transactions.')->group(function () {
+
+        Route::get('/transactions', [TransactionController::class, 'index'])->name('index');
+        Route::get('/transactions/{id}/edit', [TransactionController::class, 'edit'])->name('edit');
+        Route::get('/transactions/{id}/cancel', [TransactionController::class, 'cancel'])->name('cancel');
+        Route::get('/transactions/{id}/accept', [TransactionController::class, 'accept'])->name('accept');
+        Route::get('/transactions/{id}/ship', [TransactionController::class, 'ship'])->name('ship');
+        Route::get('/transactions/{id}/complete', [TransactionController::class, 'complete'])->name('complete');
+        Route::delete('/transactions/{id}', [TransactionController::class, 'destroy'])->name('destroy');
+    });
+});
+
 
 require __DIR__ . '/auth.php';
