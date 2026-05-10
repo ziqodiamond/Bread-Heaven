@@ -158,6 +158,15 @@ class PaymentMethod extends Model
         return $this->provider === 'midtrans';
     }
 
+    /**
+     * URL gambar payment method
+     */
+    public function getImageAttribute(): string
+    {
+        return $this->image_url
+            ? asset('storage/' . $this->image_url)
+            : asset('images/no-image.png');
+    }
     /*
     |--------------------------------------------------------------------------
     | Query Scope

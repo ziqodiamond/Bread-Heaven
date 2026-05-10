@@ -279,10 +279,10 @@
 
                     @auth
                         {{-- Tombol Cart --}}
-                        <button id="cart-button"
+                        <button @click="$dispatch('open-cart')" {{-- trigger buka modal --}}
                             class="relative w-9 h-9 rounded-lg flex items-center justify-center
-                                   bg-white/10 border border-white/15 text-white/85
-                                   hover:bg-white/18 hover:text-white transition-all duration-150"
+           bg-white/10 border border-white/15 text-white/85
+           hover:bg-white/18 hover:text-white transition-all duration-150"
                             title="Keranjang">
                             <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.8"
                                 stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
@@ -293,8 +293,8 @@
                             @if (Auth::user()->cart?->items->count() > 0)
                                 <span
                                     class="absolute -top-1.5 -right-1.5 min-w-[17px] h-[17px] px-1
-                                             bg-blue-500 text-white text-[10px] font-bold rounded-full
-                                             flex items-center justify-center border-2 border-[#0f3460]">
+                     bg-blue-500 text-white text-[10px] font-bold rounded-full
+                     flex items-center justify-center border-2 border-[#0f3460]">
                                     {{ Auth::user()->cart->items->count() }}
                                 </span>
                             @endif

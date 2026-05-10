@@ -13,7 +13,14 @@ class PaymentMethodController extends Controller
      */
     public function index(Request $request)
     {
-        $categories = PaymentMethod::select('category')->distinct()->pluck('category');
+        $categories = [
+
+            'bank_transfer',
+            'e_wallet',
+            'qris',
+            'retail_outlet',
+            'credit_card',
+        ];
         $statuses = ['available', 'not available'];
 
         $paymentMethods = PaymentMethod::query()
@@ -36,25 +43,60 @@ class PaymentMethodController extends Controller
     public function store(Request $request)
     {
         $validatedData = $request->validate([
+
+            // Informasi payment
             'name' => 'required|string|max:255',
-            'category' => 'required|string|max:255',
+
+            // Kode unik payment
+            'code' => 'required|string|max:255|unique:payment_methods,code',
+
+            // Kategori payment
+            'category' => 'nullable|string|max:255',
+
+            // Provider
+            'provider' => 'nullable|string|max:255',
+
+            // Informasi rekening
             'account_number' => 'nullable|string|max:50',
-            'image_url' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'account_name' => 'nullable|string|max:255',
+
+            // Fee tambahan
             'fee' => 'nullable|numeric',
+
+            // Status payment
             'status' => 'required|in:available,not_available',
+
+            // Logo / icon payment
+            'image_url' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
 
-        // Mengunggah gambar jika ada
+        /*
+    |--------------------------------------------------------------------------
+    | Upload gambar payment method
+    |--------------------------------------------------------------------------
+    */
         if ($request->hasFile('image_url')) {
-            $imagePath = $request->file('image_url')->store('payment_images', 'public');
+
+            $imagePath = $request->file('image_url')
+                ->store('payment_images', 'public');
+
             $validatedData['image_url'] = $imagePath;
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | Simpan payment method
+    |--------------------------------------------------------------------------
+    */
         PaymentMethod::create($validatedData);
 
-        return redirect()->back()->with('success', 'Payment method created successfully.');
+        return redirect()
+            ->back()
+            ->with(
+                'success',
+                'Payment method berhasil ditambahkan.'
+            );
     }
-
     public function edit($id)
     {
         $paymentMethod = PaymentMethod::findOrFail($id);

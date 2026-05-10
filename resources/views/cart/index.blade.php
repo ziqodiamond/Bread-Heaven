@@ -10,7 +10,7 @@
                 </h2>
 
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {{ $cart->items->count() }} item di cart lu
+                    {{ $cart->items->count() }} item di keranjang anda
                 </p>
             </div>
 
@@ -40,7 +40,7 @@
                                         </h3>
 
                                         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                            Rp{{ number_format($item->product_ebprice, 0, ',', '.') }}
+                                            Rp{{ number_format($item->product_price, 0, ',', '.') }}
                                         </p>
 
                                         <!-- Action -->

@@ -40,6 +40,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{address}/edit', [AddressController::class, 'edit'])->name('edit');
         Route::put('/{address}', [AddressController::class, 'update'])->name('update');
         Route::delete('/{address}', [AddressController::class, 'destroy'])->name('destroy');
+        Route::patch('/{address}/set-default', [AddressController::class, 'setDefault'])->name('setDefault');
     });
 
     Route::prefix('/cart')->name('cart.')->group(function () {

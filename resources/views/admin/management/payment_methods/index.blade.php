@@ -89,7 +89,7 @@
                                     <div class="flex items-center gap-3">
                                         {{-- Logo jika ada, fallback ke inisial --}}
                                         @if ($method->image_url)
-                                            <img src="{{ $method->image_url }}" alt="{{ $method->name }}"
+                                            <img src="{{ $method->image }}" alt="{{ $method->name }}"
                                                 class="h-8 w-8 rounded-lg object-contain border border-gray-100 bg-gray-50 p-1 shrink-0">
                                         @else
                                             <div

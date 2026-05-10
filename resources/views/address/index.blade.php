@@ -1,11 +1,11 @@
 <x-layout>
 
-    <div class="space-y-6 m-6 text-gray-900">
+    <div class="space-y-6 m-10 text-gray-900">
 
         {{-- ─── Header ─── --}}
         <div class="flex items-start justify-between">
             <div>
-                <h1 class="text-xl font-semibold text-gray-900">Alamat Saya</h1>
+                <h1 class="text-2xl font-semibold text-gray-900">Alamat Saya</h1>
                 <p class="mt-0.5 text-sm text-gray-500">
                     Kelola alamat pengiriman kamu
                 </p>
@@ -20,26 +20,7 @@
             </a>
         </div>
 
-        {{-- ─── Flash Message ─── --}}
-        @if (session('success'))
-            <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)"
-                x-transition:leave="transition ease-in duration-300"
-                x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2"
-                class="flex items-center gap-3 rounded-xl border border-green-100 bg-green-50 px-4 py-3">
-                <div class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-green-100">
-                    <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                </div>
-                <p class="text-sm text-green-700">{{ session('success') }}</p>
-                <button @click="show = false" class="ml-auto text-green-400 hover:text-green-600">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-        @endif
+
 
         {{-- ─── Empty State ─── --}}
         @if ($addresses->isEmpty())
