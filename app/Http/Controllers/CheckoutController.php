@@ -176,10 +176,10 @@ class CheckoutController extends Controller
                 'nullable',
                 'exists:user_addresses,id',
             ],
-            'shipping_option_id' => [
+            'shipping_rate_id' => [
                 'required_if:delivery_mode,delivery',
                 'nullable',
-                // TODO: ganti ke 'exists:shipping_methods,id' saat pakai Biteship
+                'exists:shipping_rates,id',
             ],
 
             'notes' => ['nullable', 'string', 'max:1000'],
@@ -191,12 +191,8 @@ class CheckoutController extends Controller
         /* Resolve cart items                                                   */
         /* ------------------------------------------------------------------ */
         if ($request->checkout_mode === 'buy_now') {
-
-            // buy_now: ambil dari session atau re-query
-            // (implement sesuai kebutuhan flow buy_now kamu)
             abort(501, 'Buy now store belum diimplementasikan.');
         } else {
-
             $cart = $user->cart()
                 ->with(['items.product'])
                 ->firstOrFail();
@@ -208,52 +204,77 @@ class CheckoutController extends Controller
         /* Hitung total                                                         */
         /* ------------------------------------------------------------------ */
         $subtotal     = $cart->items->sum('subtotal');
+        $totalWeight  = $cart->items->sum('total_weight');
         $shippingFee  = 0;
+        $shippingRate = null;
 
         if ($validated['delivery_mode'] === 'delivery') {
-            // TODO Biteship: ambil harga dari shipping_option_id
-            // Sementara dummy — nanti diganti setelah integrasi Biteship
-            $shippingFee = 0;
-        }
+            // Fetch shipping rate yang dipilih
+            $shippingRate = \App\Models\ShippingRate::findOrFail(
+                $validated['shipping_rate_id']
+            );
 
-        $total = $subtotal + $shippingFee;
-
-        /* ------------------------------------------------------------------ */
-        /* Resolve alamat pengiriman                                            */
-        /* ------------------------------------------------------------------ */
-        $shippingAddress = null;
-
-        if ($validated['delivery_mode'] === 'delivery') {
-
-            $shippingAddress = UserAddress::where('id', $validated['user_address_id'])
+            // Verify alamat belongs to user
+            $address = UserAddress::where('id', $validated['user_address_id'])
                 ->where('user_id', $user->id)
                 ->firstOrFail();
+
+            $shippingFee = $shippingRate->price;
+        } else {
+            // Pickup - no shipping fee
+            $address = null;
         }
+
+        $serviceFee = (int) config('checkout.service_fee', 0);
+        $discountAmount = 0;
+        $grandTotal = $subtotal + $shippingFee + $serviceFee - $discountAmount;
 
         /* ------------------------------------------------------------------ */
         /* Buat Order                                                           */
         /* ------------------------------------------------------------------ */
+        $store = Store::active()->shippingOrigin()->first()
+            ?? Store::active()->first();
+
         $order = Order::create([
             'user_id'            => $user->id,
-            'order_number'       => $this->generateOrderNumber(),
-            'status'             => 'pending_payment',
-
-            // Delivery
-            'delivery_mode'      => $validated['delivery_mode'],
-            'user_address_id'    => $shippingAddress?->id,
-
-            // Shipping
-            // TODO Biteship: simpan shipping_method_id + biteship_order_id
-            'shipping_method_id' => null,
-            'shipping_fee'       => $shippingFee,
-
-            // Payment
+            'invoice_number'     => $this->generateInvoiceNumber(),
+            'user_address_id'    => $address?->id,
             'payment_method_id'  => $validated['payment_method_id'],
-            'payment_status'     => 'unpaid',
+
+            // Informasi Customer
+            'customer_name'      => $user->name,
+            'customer_email'     => $user->email,
+            'customer_phone'     => $user->phone,
+
+            // Snapshot Alamat Pengiriman
+            'shipping_receiver_name'   => $address?->receiver_name,
+            'shipping_receiver_phone'  => $address?->receiver_phone,
+            'shipping_province'        => $address?->province,
+            'shipping_city'            => $address?->city,
+            'shipping_district'        => $address?->district,
+            'shipping_postal_code'     => $address?->postal_code,
+            'shipping_full_address'    => $address?->full_address,
+            'shipping_notes'           => $address?->notes,
+
+            // Shipping Info
+            'shipping_courier'   => $shippingRate?->courier_name,
+            'shipping_service'   => $shippingRate?->service_name,
+            'shipping_etd'       => $shippingRate?->etd,
 
             // Harga
             'subtotal'           => $subtotal,
-            'total'              => $total,
+            'shipping_cost'      => $shippingFee,
+            'service_fee'        => $serviceFee,
+            'discount_amount'    => $discountAmount,
+            'grand_total'        => $grandTotal,
+
+            // Berat
+            'total_weight'       => $totalWeight,
+
+            // Status
+            'order_status'       => 'pending_payment',
+            'payment_status'     => 'unpaid',
+            'payment_gateway'    => 'midtrans',
 
             // Catatan
             'notes'              => $validated['notes'],
@@ -263,8 +284,7 @@ class CheckoutController extends Controller
         /* Buat Order Items                                                     */
         /* ------------------------------------------------------------------ */
         foreach ($cart->items as $item) {
-
-            OrderItem::create([
+            \App\Models\OrderItem::create([
                 'order_id'   => $order->id,
                 'product_id' => $item->product_id,
                 'quantity'   => $item->quantity,
@@ -273,8 +293,26 @@ class CheckoutController extends Controller
                 'weight'     => $item->total_weight,
             ]);
 
-            // Kurangi stok
             $item->product->decrement('stock', $item->quantity);
+        }
+
+        /* ------------------------------------------------------------------ */
+        /* Snapshot Shipping Rate ke ShippingRate jika delivery                 */
+        /* ------------------------------------------------------------------ */
+        if ($shippingRate) {
+            $shippingRate->update([
+                'order_id' => $order->id,
+                'origin' => [
+                    'latitude' => $store->latitude,
+                    'longitude' => $store->longitude,
+                    'address' => $store->full_address,
+                ],
+                'destination' => [
+                    'latitude' => $address->latitude,
+                    'longitude' => $address->longitude,
+                    'address' => $address->full_address_text,
+                ],
+            ]);
         }
 
         /* ------------------------------------------------------------------ */
@@ -282,63 +320,30 @@ class CheckoutController extends Controller
         /* ------------------------------------------------------------------ */
         $cart->items()->delete();
 
-        // /* ------------------------------------------------------------------ */
-        // /* TODO Midtrans — Payment Gateway                                      */
-        // |--------------------------------------------------------------------------
-        // | Aktifkan blok ini setelah install midtrans/midtrans-php
-        // |
-        // | \Midtrans\Config::$serverKey    = config('midtrans.server_key');
-        // | \Midtrans\Config::$isProduction = config('midtrans.is_production');
-        // | \Midtrans\Config::$isSanitized  = true;
-        // | \Midtrans\Config::$is3ds        = true;
-        // |
-        // | $snapToken = \Midtrans\Snap::getSnapToken([
-        // |     'transaction_details' => [
-        // |         'order_id'     => $order->order_number,
-        // |         'gross_amount' => $order->total,
-        // |     ],
-        // |     'customer_details' => [
-        // |         'first_name' => $user->name,
-        // |         'email'      => $user->email,
-        // |         'phone'      => $user->phone,
-        // |     ],
-        // |     'item_details' => $cart->items->map(fn($i) => [
-        // |         'id'       => $i->product_id,
-        // |         'price'    => $i->price,
-        // |         'quantity' => $i->quantity,
-        // |         'name'     => $i->product->name,
-        // |     ])->toArray(),
-        // | ]);
-        // |
-        // | $order->update(['snap_token' => $snapToken]);
-        // |
-        // | return redirect()->route('payment.snap', $order->id);
-        // |--------------------------------------------------------------------------
-        // /* ------------------------------------------------------------------ */
+        /* ------------------------------------------------------------------ */
+        /* Create Midtrans Transaction (Payment)                               */
+        /* ------------------------------------------------------------------ */
+        $midtransService = app(\App\Services\MidtransService::class);
+        $paymentResult = $midtransService->createTransaction($order);
 
-        // /* ------------------------------------------------------------------ */
-        // /* TODO Biteship — Buat Shipment Order                                  */
-        // |--------------------------------------------------------------------------
-        // | Aktifkan setelah integrasi Biteship:
-        // |
-        // | $biteshipOrder = app(\App\Services\BiteshipService::class)->createOrder([
-        // |     'origin_contact_name'       => config('store.name'),
-        // |     'origin_address'            => $store->full_address_text,
-        // |     'origin_coord'              => [$store->latitude, $store->longitude],
-        // |     'destination_contact_name'  => $shippingAddress->receiver_name,
-        // |     'destination_contact_phone' => $shippingAddress->receiver_phone,
-        // |     'destination_address'       => $shippingAddress->full_address_text,
-        // |     'courier_company'           => $validated['shipping_option_id'],
-        // |     'items'                     => ...,
-        // | ]);
-        // |
-        // | $order->update(['biteship_order_id' => $biteshipOrder['id']]);
-        // |--------------------------------------------------------------------------
-        // /* ------------------------------------------------------------------ */
+        if (!$paymentResult['success']) {
+            // Jika Midtrans gagal, cancel order
+            $order->cancel();
+            return redirect()
+                ->back()
+                ->with('error', 'Gagal membuat transaksi pembayaran: ' . $paymentResult['error']);
+        }
 
-        return redirect()
-            ->route('orders.show', $order->id)
-            ->with('success', 'Pesanan berhasil dibuat! Silakan lakukan pembayaran.');
+        // Save payment reference
+        $order->update([
+            'payment_reference' => $paymentResult['transaction']->id,
+        ]);
+
+        /* ------------------------------------------------------------------ */
+        /* Redirect ke Midtrans Snap Payment Page                              */
+        /* ------------------------------------------------------------------ */
+        return redirect($paymentResult['redirect_url'])
+            ->with('success', 'Pesanan dibuat! Silakan lakukan pembayaran.');
     }
 
     /*
@@ -355,48 +360,119 @@ class CheckoutController extends Controller
     {
         $validated = $request->validate([
             'address_id' => ['required', 'exists:user_addresses,id'],
-            'weight'     => ['required', 'integer', 'min:1'],
+            'weight'     => ['required', 'integer', 'min:100'], // minimum 100 gram
         ]);
 
-        $address = UserAddress::where('id', $validated['address_id'])
-            ->where('user_id', auth()->id())
-            ->firstOrFail();
+        try {
+            $user = auth()->user();
 
-        $store = Store::active()->shippingOrigin()->first()
-            ?? Store::active()->first();
+            // Verify address belongs to user
+            $address = UserAddress::where('id', $validated['address_id'])
+                ->where('user_id', $user->id)
+                ->firstOrFail();
 
-        /*
-         * TODO Biteship: panggil Biteship Rates API
-         *
-         * $rates = app(\App\Services\BiteshipService::class)->getRates([
-         *     'origin_latitude'       => $store->latitude,
-         *     'origin_longitude'      => $store->longitude,
-         *     'destination_latitude'  => $address->latitude,
-         *     'destination_longitude' => $address->longitude,
-         *     'items'                 => [
-         *         ['name' => 'Produk', 'value' => 10000, 'weight' => $validated['weight']],
-         *     ],
-         * ]);
-         *
-         * return response()->json($rates['pricing']);
-         */
+            // Get origin store
+            $store = Store::active()->shippingOrigin()->first()
+                ?? Store::active()->first();
 
-        // Sementara kembalikan shipping methods dari DB
-        $methods = ShippingMethod::available()
-            ->orderBy('courier_name')
-            ->get()
-            ->map(fn($m) => [
-                'id'           => $m->id,
-                'name'         => $m->full_name,
-                'courier_name' => $m->courier_name,
-                'service_name' => $m->service_name,
-                'etd'          => $m->estimated_delivery,
-                'price'        => $m->additional_fee,
+            abort_if(
+                !$store ||
+                    !$store->latitude ||
+                    !$store->longitude,
+                404,
+                'Store tidak memiliki koordinat GPS'
+            );
+
+            abort_if(
+                !$address->latitude ||
+                    !$address->longitude,
+                400,
+                'Alamat belum memiliki koordinat GPS'
+            );
+
+            // Hit Biteship API
+            $biteshipService = app(\App\Services\BiteshipService::class);
+            $ratesResult = $biteshipService->getRates(
+                originLat: (float) $store->latitude,
+                originLng: (float) $store->longitude,
+                destLat: (float) $address->latitude,
+                destLng: (float) $address->longitude,
+                weight: $validated['weight'],
+                items: []
+            );
+
+            if (!$ratesResult['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $ratesResult['error'] ?? 'Gagal fetch ongkir',
+                    'rates' => [],
+                ], 422);
+            }
+
+            // Format rates dan save ke ShippingRate table untuk record
+            $formattedRates = array_map(function ($rate) use ($address, $store, $validated) {
+                // Save ke ShippingRate sebagai reference
+                $shippingRate = \App\Models\ShippingRate::create([
+
+                    'provider' => 'biteship',
+
+                    'courier_name' => $rate['courier_company'],
+                    'courier_code' => $rate['courier_company'],
+
+                    'service_name' => $rate['courier_type'],
+                    'service_code' => $rate['courier_type'],
+
+                    'origin' => [
+                        'latitude' => $store->latitude,
+                        'longitude' => $store->longitude,
+                    ],
+
+                    'destination' => [
+                        'latitude' => $address->latitude,
+                        'longitude' => $address->longitude,
+                    ],
+
+                    'weight' => $validated['weight'],
+
+                    'etd' => $rate['etd'],
+
+                    'price' => $rate['price'],
+
+                    'response' => $rate,
+                ]);
+
+                return [
+                    'id' => $shippingRate->id,
+                    'name' => $rate['courier_company'] . ' - ' . $rate['courier_type'],
+                    'courier_company' => $rate['courier_company'],
+                    'courier_type' => $rate['courier_type'],
+                    'service_type' => $rate['service_type'],
+                    'description' => $rate['description'] ?? '',
+                    'price' => $rate['price'],
+                    'price_formatted' => 'Rp ' . number_format($rate['price'], 0, ',', '.'),
+                    'etd' => $rate['etd'],
+                    'features' => $rate['features'] ?? [],
+                    'display_name' => $rate['courier_company'] . ' - ' . $rate['courier_type'] .
+                        ' (' . $rate['etd'] . ')',
+                ];
+            }, $ratesResult['pricing'] ?? []);
+
+            return response()->json([
+                'success' => true,
+                'rates' => $formattedRates,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('CheckoutController::shippingRates error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
-        return response()->json([
-            'rates' => $methods,
-        ]);
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'rates' => [],
+            ], 400);
+        }
     }
 
     /*
@@ -405,8 +481,8 @@ class CheckoutController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function generateOrderNumber(): string
+    private function generateInvoiceNumber(): string
     {
-        return 'ORD-' . strtoupper(Str::random(8)) . '-' . now()->format('Ymd');
+        return 'INV-' . strtoupper(Str::random(8)) . '-' . now()->format('Ymd');
     }
 }

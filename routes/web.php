@@ -7,6 +7,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DeliveryMethodController;
 use App\Http\Controllers\GeneralController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
@@ -24,6 +25,9 @@ Route::prefix('/')->group(function () {
     Route::get('/products', [GeneralController::class, 'products'])->name('products');
     Route::get('/product/{id}', [GeneralController::class, 'show'])->name('product.show');
 });
+
+// WEBHOOK ROUTES (tanpa auth)
+Route::post('/webhook/payment/notification', [PaymentController::class, 'notification'])->name('webhook.payment.notification');
 
 // AUTH ROUTES
 Route::middleware('auth')->group(function () {
@@ -54,8 +58,17 @@ Route::middleware('auth')->group(function () {
     Route::prefix('/checkout')->name('checkout.')->group(function () {
         Route::get('/', [CheckoutController::class, 'index'])->name('index');
         Route::post('/buy-now', [CheckoutController::class, 'buyNow'])->name('buy-now');
-        Route::post('/', [CheckoutController::class, 'proceed'])->name('store');
-        Route::post('/shipping-rates', [CheckoutController::class, 'shippingRates'])->name('shipping-rates');
+        Route::post('/', [CheckoutController::class, 'store'])->name('store');
+        Route::get('/shipping-rates', [CheckoutController::class, 'shippingRates'])->name('shipping-rates');
+    });
+
+    Route::prefix('/payment')->name('payment.')->group(function () {
+        Route::get('/{order}', [PaymentController::class, 'show'])->name('show');
+        Route::post('/notification', [PaymentController::class, 'notification'])->name('notification');
+        Route::get('/{order}/finish', [PaymentController::class, 'finish'])->name('finish');
+        Route::get('/{order}/unfinish', [PaymentController::class, 'unfinish'])->name('unfinish');
+        Route::get('/{order}/error', [PaymentController::class, 'error'])->name('error');
+        Route::post('/{order}/retry', [PaymentController::class, 'retry'])->name('retry');
     });
 
     Route::prefix('/transaction')->name('transaction.')->group(function () {

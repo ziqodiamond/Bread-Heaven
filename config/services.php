@@ -42,4 +42,37 @@ return [
         'api_key' => env('BITESHIP_API_KEY'),
     ],
 
+    'midtrans' => [
+
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+
+        'client_key' => env('MIDTRANS_CLIENT_KEY'),
+
+        'is_production' => env('MIDTRANS_IS_PRODUCTION', false),
+
+        'is_sanitized' => env('MIDTRANS_IS_SANITIZED', true),
+
+        'is_3ds' => env('MIDTRANS_IS_3DS', true),
+
+        'enabled_payments' => [
+            'credit_card',
+            'bank_transfer',
+            'echannel',
+            'cimb_clicks',
+            'bca_clicks',
+            'bri_clicks',
+            'danamon_online',
+            'mandiri_clickpay',
+            'bdo_uatpay',
+            'maybank_go',
+            'uob_click',
+            'gopay',
+            'shopeepay',
+            'convstore',
+            'indomart',
+            'alfamart',
+            'akulaku',
+        ],
+    ],
+
 ];

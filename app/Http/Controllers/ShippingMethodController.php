@@ -23,15 +23,81 @@ class ShippingMethodController extends Controller
     public function store(Request $request)
     {
         $validatedData = $request->validate([
-            'name' => 'required|string|max:255',
-            'shipping_cost' => 'required|numeric',
+
+            /*
+        |--------------------------------------------------------------------------
+        | Provider Shipping
+        |--------------------------------------------------------------------------
+        */
+
+            'provider' => 'required|string|max:255',
+
+            /*
+        |--------------------------------------------------------------------------
+        | Informasi Courier
+        |--------------------------------------------------------------------------
+        */
+
+            'courier_name' => 'required|string|max:255',
+
+            'courier_code' => 'required|string|max:255',
+
+            /*
+        |--------------------------------------------------------------------------
+        | Informasi Service
+        |--------------------------------------------------------------------------
+        */
+
+            'service_name' => 'required|string|max:255',
+
+            'service_code' => 'required|string|max:255',
+
+            /*
+        |--------------------------------------------------------------------------
+        | Deskripsi
+        |--------------------------------------------------------------------------
+        */
+
+            'description' => 'nullable|string',
+
+            /*
+        |--------------------------------------------------------------------------
+        | Estimasi Pengiriman
+        |--------------------------------------------------------------------------
+        */
+
+            'estimated_delivery' => 'nullable|string|max:255',
+
+            /*
+        |--------------------------------------------------------------------------
+        | Fee Tambahan
+        |--------------------------------------------------------------------------
+        */
+
+            'additional_fee' => 'nullable|numeric|min:0',
+
+            /*
+        |--------------------------------------------------------------------------
+        | Status
+        |--------------------------------------------------------------------------
+        */
+
             'status' => 'required|in:available,not_available',
         ]);
 
-
+        /*
+    |--------------------------------------------------------------------------
+    | Simpan shipping method
+    |--------------------------------------------------------------------------
+    */
         ShippingMethod::create($validatedData);
 
-        return redirect()->back()->with('success', 'Shipping method created successfully.');
+        return redirect()
+            ->back()
+            ->with(
+                'success',
+                'Shipping method berhasil ditambahkan.'
+            );
     }
 
     public function update(Request $request, ShippingMethod $shippingMethod)

@@ -115,13 +115,14 @@ class ShippingRate extends Model
     {
         return [
 
-            // Harga bigint
             'price' => 'integer',
 
-            // Berat
             'weight' => 'integer',
 
-            // JSON response
+            'origin' => 'array',
+
+            'destination' => 'array',
+
             'response' => 'array',
         ];
     }

@@ -444,21 +444,43 @@
     
         async fetchRates(addressId) {
             this.loadingRates = true;
+    
             try {
-                const res = await fetch('/checkout/shipping-rates?' + new URLSearchParams({
-                    address_id: addressId,
-                    weight: this.totalWeight,
-                }), {
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                        'Accept': 'application/json',
-                    },
-                });
+    
+                const res = await fetch(
+                    '/checkout/shipping-rates?' + new URLSearchParams({
+                        address_id: addressId,
+                        weight: this.totalWeight,
+                    }), {
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            'Accept': 'application/json',
+                        },
+                    }
+                );
+    
                 const data = await res.json();
+    
+                console.log(data);
+    
+                if (!res.ok) {
+                    throw data;
+                }
+    
                 this.shippingRates = data.rates ?? [];
+    
             } catch (e) {
-                console.error('Gagal fetch ongkir:', e);
+    
+                console.error('DETAIL ERROR ONGKIR:', e);
+    
+                alert(
+                    e.error ??
+                    e.message ??
+                    'Gagal fetch ongkir'
+                );
+    
                 this.shippingRates = [];
+    
             } finally {
                 this.loadingRates = false;
             }
