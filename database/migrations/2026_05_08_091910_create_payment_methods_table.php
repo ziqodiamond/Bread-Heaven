@@ -84,11 +84,37 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            // Biaya admin payment
-            // Menggunakan bigint
-            // Contoh:
-            // 2500 = Rp2.500
-            $table->bigInteger('fee')->default(0);
+            /*
+            | Jenis fee payment
+            |
+            | fixed  = biaya tetap
+            | percent = biaya persentase
+            */
+            $table->enum('fee_type', [
+                'fixed',
+                'percent',
+            ])->default('fixed');
+
+            /*
+            | Nilai fee
+            |
+            | Contoh:
+            | 4000 = Rp4.000
+            | 0.7 = 0.7%
+            */
+            $table->decimal('fee_value', 12, 2)
+                ->default(0);
+
+            /*
+            | Tipe pajak fee
+            |
+            | before_tax = fee belum termasuk pajak
+            | after_tax  = fee sudah termasuk pajak
+            */
+            $table->enum('fee_tax_type', [
+                'before_tax',
+                'after_tax',
+            ])->nullable();
 
             /*
             |--------------------------------------------------------------------------

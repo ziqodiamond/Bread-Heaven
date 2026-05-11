@@ -5,7 +5,7 @@
     - Data toko dari model Store (nama, alamat, jam operasional, maps)
     - Payment methods dari DB grouped by category + image_url support
     - Shipping methods via AJAX /checkout/shipping-rates (Biteship-ready)
-    - Alpine x-data inline (no Alpine.data / @push — fix ReferenceError)
+    - Alpine x-data dengan window.__vars untuk menghindari CSP eval error
 --}}
 
     <style>
@@ -415,20 +415,96 @@
         }
     </style>
 
+    {{-- ============================================================
+         FIX CSP EVAL ERROR:
+         Semua data PHP di-pass lewat window.__vars di <script> tag biasa,
+         bukan di-embed langsung di dalam string atribut x-data="{ ... }".
+         Alpine.js tidak perlu eval() untuk membaca property dari object JS.
+    ============================================================ --}}
+    @php
+        $paymentFeesData = $paymentMethods
+            ->mapWithKeys(
+                fn($pm) => [
+                    $pm->id => [
+                        'fee_type' => $pm->fee_type,
+                        'fee_value' => (float) $pm->fee_value,
+                        'fee_tax_type' => $pm->fee_tax_type,
+                    ],
+                ],
+            )
+            ->toArray();
+
+        $defaultAddressId = $addresses->where('is_default', true)->first()?->id;
+    @endphp
+
+    <script>
+        window.__checkoutData = {
+            paymentFees: @json($paymentFeesData),
+            selectedAddress: @json($defaultAddressId),
+            subtotal: {{ (int) $subtotal }},
+            totalWeight: {{ (int) $totalWeight }},
+        };
+    </script>
+
     <div class="checkout-root mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8" x-data="{
+    
         deliveryMode: 'delivery',
-        selectedAddress: {{ json_encode($addresses->where('is_default', true)->first()?->id) ?? 'null' }},
+        selectedAddress: null,
         selectedShipping: null,
         shippingPrice: 0,
         shippingRates: [],
         loadingRates: false,
         selectedPayment: null,
-        subtotal: {{ (int) $subtotal }},
-        totalWeight: {{ (int) $totalWeight }},
+        subtotal: 0,
+        totalWeight: 0,
+        paymentFees: {},
+    
+        get paymentFee() {
+            if (!this.selectedPayment) return 0;
+            const cfg = this.paymentFees[this.selectedPayment];
+            if (!cfg) return 0;
+            const base = this.subtotal + (this.deliveryMode === 'delivery' ? this.shippingPrice : 0);
+            if (cfg.fee_type === 'fixed') {
+                let fee = cfg.fee_value;
+                if (cfg.fee_tax_type === 'before_tax') fee = fee * 1.11;
+                return Math.round(fee);
+            }
+            if (cfg.fee_type === 'percent') {
+                return Math.round(base * (cfg.fee_value / 100));
+            }
+            return 0;
+        },
+    
+        calcFeeFor(pmId) {
+            const cfg = this.paymentFees[pmId];
+            if (!cfg) return 0;
+            const base = this.subtotal + (this.deliveryMode === 'delivery' ? this.shippingPrice : 0);
+            if (cfg.fee_type === 'fixed') {
+                let fee = cfg.fee_value;
+                if (cfg.fee_tax_type === 'before_tax') fee = fee * 1.11;
+                return Math.round(fee);
+            }
+            if (cfg.fee_type === 'percent') {
+                return Math.round(base * (cfg.fee_value / 100));
+            }
+            return 0;
+        },
+    
+        feeLabel(pmId) {
+            const cfg = this.paymentFees[pmId];
+            if (!cfg) return '';
+            const fee = this.calcFeeFor(pmId);
+            if (fee === 0) return 'Gratis';
+            if (cfg.fee_type === 'percent') {
+                return '+' + cfg.fee_value + '% (' + this.formatRp(fee) + ')';
+            }
+            return '+' + this.formatRp(fee);
+        },
     
         get total() {
-            return this.subtotal + (this.deliveryMode === 'delivery' ? this.shippingPrice : 0);
+            return this.subtotal + (this.deliveryMode === 'delivery' ? this.shippingPrice : 0) + this.paymentFee;
         },
+    
         get canSubmit() {
             if (this.deliveryMode === 'pickup') return this.selectedPayment !== null;
             return this.selectedAddress !== null && this.selectedShipping !== null && this.selectedPayment !== null;
@@ -444,9 +520,7 @@
     
         async fetchRates(addressId) {
             this.loadingRates = true;
-    
             try {
-    
                 const res = await fetch(
                     '/checkout/shipping-rates?' + new URLSearchParams({
                         address_id: addressId,
@@ -458,29 +532,14 @@
                         },
                     }
                 );
-    
                 const data = await res.json();
-    
                 console.log(data);
-    
-                if (!res.ok) {
-                    throw data;
-                }
-    
+                if (!res.ok) throw data;
                 this.shippingRates = data.rates ?? [];
-    
             } catch (e) {
-    
                 console.error('DETAIL ERROR ONGKIR:', e);
-    
-                alert(
-                    e.error ??
-                    e.message ??
-                    'Gagal fetch ongkir'
-                );
-    
+                alert(e.error ?? e.message ?? 'Gagal fetch ongkir');
                 this.shippingRates = [];
-    
             } finally {
                 this.loadingRates = false;
             }
@@ -496,6 +555,13 @@
         },
     
         init() {
+            // Ambil semua data dari window.__checkoutData (tidak perlu eval)
+            const d = window.__checkoutData ?? {};
+            this.paymentFees = d.paymentFees ?? {};
+            this.selectedAddress = d.selectedAddress ?? null;
+            this.subtotal = d.subtotal ?? 0;
+            this.totalWeight = d.totalWeight ?? 0;
+    
             if (this.deliveryMode === 'delivery' && this.selectedAddress) {
                 this.fetchRates(this.selectedAddress);
             }
@@ -783,7 +849,7 @@
                                             </div>
                                             <div class="payment-icon">
                                                 @if ($pm->image_url)
-                                                    <img src="{{ $pm->image }}" alt="{{ $pm->name }}"
+                                                    <img src="{{ $pm->image_url }}" alt="{{ $pm->name }}"
                                                         style="width:28px;height:28px;object-fit:contain;">
                                                 @else
                                                     <svg width="16" height="16" viewBox="0 0 24 24"
@@ -804,12 +870,13 @@
                                                     @if ($pm->account_number)
                                                         &middot; {{ $pm->account_number }}
                                                     @endif
-                                                    @if ($pm->fee > 0)
-                                                        &middot; <span class="text-amber-500">+Rp
-                                                            {{ number_format($pm->fee, 0, ',', '.') }}</span>
-                                                    @endif
                                                 </p>
                                             </div>
+                                            {{-- Fee label dihitung realtime oleh Alpine --}}
+                                            <span class="text-xs font-medium whitespace-nowrap"
+                                                :class="calcFeeFor('{{ $pm->id }}') === 0 ?
+                                                    'text-green-600 dark:text-green-400' : 'text-amber-500'"
+                                                x-text="feeLabel('{{ $pm->id }}')"></span>
                                         </div>
                                     @endforeach
                                 </div>
@@ -884,6 +951,10 @@
                                     <span x-show="deliveryMode === 'delivery' && shippingPrice > 0"
                                         class="text-gray-900 dark:text-white" x-text="formatRp(shippingPrice)"></span>
                                 </span>
+                            </div>
+                            <div class="flex items-center justify-between mb-3" x-show="paymentFee > 0">
+                                <span class="text-sm text-gray-400">Biaya Layanan</span>
+                                <span class="text-sm font-medium text-amber-500" x-text="formatRp(paymentFee)"></span>
                             </div>
 
                             <div class="summary-divider"></div>

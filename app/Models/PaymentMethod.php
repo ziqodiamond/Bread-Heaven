@@ -12,25 +12,7 @@ class PaymentMethod extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Table
-    |--------------------------------------------------------------------------
-    */
-
-    protected $table = 'payment_methods';
-
-    /*
-    |--------------------------------------------------------------------------
-    | Primary Key
-    |--------------------------------------------------------------------------
-    */
-
-    protected $keyType = 'string';
-
-    public $incrementing = false;
-
-    /*
-    |--------------------------------------------------------------------------
-    | Mass Assignment
+    | Fillable
     |--------------------------------------------------------------------------
     */
 
@@ -48,7 +30,7 @@ class PaymentMethod extends Model
 
         /*
         |--------------------------------------------------------------------------
-        | Provider
+        | Provider / Gateway
         |--------------------------------------------------------------------------
         */
 
@@ -65,11 +47,13 @@ class PaymentMethod extends Model
 
         /*
         |--------------------------------------------------------------------------
-        | Fee
+        | Payment Fee
         |--------------------------------------------------------------------------
         */
 
-        'fee',
+        'fee_type',
+        'fee_value',
+        'fee_tax_type',
 
         /*
         |--------------------------------------------------------------------------
@@ -98,7 +82,7 @@ class PaymentMethod extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Attribute Casting
+    | Casts
     |--------------------------------------------------------------------------
     */
 
@@ -106,8 +90,8 @@ class PaymentMethod extends Model
     {
         return [
 
-            // Harga bigint
-            'fee' => 'integer',
+            // Payment fee
+            'fee_value' => 'decimal:2',
 
             // Metadata JSON
             'metadata' => 'array',
@@ -116,84 +100,106 @@ class PaymentMethod extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Relationships
+    | Accessor
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Relasi ke orders
-     */
-    public function orders()
+    /*
+    |--------------------------------------------------------------------------
+    | URL logo payment method
+    |--------------------------------------------------------------------------
+    */
+
+    public function getImageUrlAttribute($value): ?string
     {
-        return $this->hasMany(Order::class);
+        if (!$value) {
+            return null;
+        }
+
+        // Jika sudah full URL
+        if (
+            str_starts_with($value, 'http://') ||
+            str_starts_with($value, 'https://')
+        ) {
+            return $value;
+        }
+
+        return asset('storage/' . $value);
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Accessors
+    | Status Available
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Mengecek payment method aktif
-     */
     public function getIsAvailableAttribute(): bool
     {
         return $this->status === 'available';
     }
 
-    /**
-     * Mengecek payment manual transfer
-     */
-    public function getIsManualAttribute(): bool
-    {
-        return $this->provider === 'manual';
-    }
-
-    /**
-     * Mengecek payment Midtrans
-     */
-    public function getIsMidtransAttribute(): bool
-    {
-        return $this->provider === 'midtrans';
-    }
-
-    /**
-     * URL gambar payment method
-     */
-    public function getImageAttribute(): string
-    {
-        return $this->image_url
-            ? asset('storage/' . $this->image_url)
-            : asset('images/no-image.png');
-    }
     /*
     |--------------------------------------------------------------------------
-    | Query Scope
+    | Scope
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Payment method aktif
-     */
     public function scopeAvailable($query)
     {
-        return $query->where('status', 'available');
+        return $query->where(
+            'status',
+            'available'
+        );
     }
 
-    /**
-     * Filter provider
-     */
-    public function scopeProvider($query, string $provider)
-    {
-        return $query->where('provider', $provider);
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | Hitung Payment Fee
+    |--------------------------------------------------------------------------
+    */
 
-    /**
-     * Filter category
-     */
-    public function scopeCategory($query, string $category)
+    public function calculateFee(int $amount): int
     {
-        return $query->where('category', $category);
+        /*
+        |--------------------------------------------------------------------------
+        | Fixed Fee
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->fee_type === 'fixed') {
+
+            $fee = (float) $this->fee_value;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Fee sebelum pajak
+            |--------------------------------------------------------------------------
+            */
+
+            if ($this->fee_tax_type === 'before_tax') {
+
+                // Tambahkan PPN 11%
+                $fee *= 1.11;
+            }
+
+            return (int) round($fee);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Percent Fee
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->fee_type === 'percent') {
+
+            $fee = $amount * (
+                ((float) $this->fee_value) / 100
+            );
+
+            return (int) round($fee);
+        }
+
+        return 0;
     }
 }

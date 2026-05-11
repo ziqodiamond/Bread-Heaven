@@ -87,7 +87,6 @@
                                 {{-- Logo + Nama --}}
                                 <td class="px-5 py-3.5">
                                     <div class="flex items-center gap-3">
-                                        {{-- Logo jika ada, fallback ke inisial --}}
                                         @if ($method->image_url)
                                             <img src="{{ $method->image }}" alt="{{ $method->name }}"
                                                 class="h-8 w-8 rounded-lg object-contain border border-gray-100 bg-gray-50 p-1 shrink-0">
@@ -114,21 +113,36 @@
 
                                 {{-- Kategori + Provider --}}
                                 <td class="px-5 py-3.5">
-                                    <p class="text-gray-700 text-xs font-medium">{{ $method->category }}</p>
+                                    <p class="text-xs font-medium text-gray-700">{{ $method->category }}</p>
                                     <p class="text-[11px] text-gray-400 mt-0.5">{{ $method->provider ?? '-' }}</p>
                                 </td>
 
                                 {{-- Nomor Rekening --}}
-                                <td class="px-5 py-3.5 text-gray-500 text-xs font-mono">
+                                <td class="px-5 py-3.5 text-xs font-mono text-gray-500">
                                     {{ $method->account_number ?? '-' }}
                                 </td>
 
-                                {{-- Fee --}}
-                                <td class="px-5 py-3.5 text-gray-700 text-xs">
-                                    @if ($method->fee > 0)
-                                        Rp {{ number_format($method->fee, 0, ',', '.') }}
+                                {{-- Fee — warna seragam semua pakai text-gray-700 --}}
+                                <td class="px-5 py-3.5">
+                                    @if ($method->fee_value > 0)
+                                        <div class="space-y-0.5">
+                                            {{-- Nilai fee --}}
+                                            <p class="text-xs font-medium text-gray-700">
+                                                @if ($method->fee_type === 'percent')
+                                                    {{ rtrim(rtrim(number_format($method->fee_value, 2, '.', ''), '0'), '.') }}%
+                                                @else
+                                                    Rp {{ number_format($method->fee_value, 0, ',', '.') }}
+                                                @endif
+                                            </p>
+                                            {{-- Label jenis + pajak --}}
+                                            <p class="text-[11px] text-gray-400">
+                                                {{ $method->fee_type === 'percent' ? 'Persentase' : 'Fixed' }}
+                                                &bull;
+                                                {{ $method->fee_tax_type === 'before_tax' ? 'Sebelum Pajak' : 'Setelah Pajak' }}
+                                            </p>
+                                        </div>
                                     @else
-                                        <span class="text-gray-400">Gratis</span>
+                                        <span class="text-xs text-gray-400">Gratis</span>
                                     @endif
                                 </td>
 
@@ -152,7 +166,6 @@
                                 {{-- Aksi --}}
                                 <td class="px-5 py-3.5">
                                     <div class="flex items-center gap-2">
-
                                         {{-- Edit --}}
                                         <button
                                             @click="openEdit({{ json_encode([
@@ -163,7 +176,9 @@
                                                 'provider' => $method->provider,
                                                 'account_number' => $method->account_number,
                                                 'account_name' => $method->account_name,
-                                                'fee' => $method->fee,
+                                                'fee_type' => $method->fee_type,
+                                                'fee_value' => $method->fee_value,
+                                                'fee_tax_type' => $method->fee_tax_type,
                                                 'image_url' => $method->image_url,
                                                 'status' => $method->status,
                                             ]) }})"
@@ -194,7 +209,6 @@
                                                 Hapus
                                             </button>
                                         </form>
-
                                     </div>
                                 </td>
                             </tr>
@@ -212,15 +226,16 @@
 
         {{-- ============================================================
              MODAL CREATE
+             Modal: max-w-2xl (lebih lebar), max-h + overflow-y-auto agar scrollable
              ============================================================ --}}
-        <div x-show="showCreate" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <div x-show="showCreate" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
             style="background: rgba(0,0,0,0.35)">
 
             <div @click.outside="showCreate = false"
-                class="w-full max-w-lg rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                class="w-full max-w-2xl rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden my-auto">
 
                 {{-- Modal header --}}
-                <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                     <div>
                         <p class="text-sm font-medium text-gray-900">Tambah Metode Pembayaran</p>
                         <p class="text-xs text-gray-400 mt-0.5">Isi data metode pembayaran baru</p>
@@ -237,27 +252,25 @@
 
                 {{-- Form --}}
                 <form action="{{ route('admin.management.payment-methods.store') }}" method="POST"
-                    enctype="multipart/form-data" class="px-5 py-4 space-y-4">
+                    enctype="multipart/form-data" class="px-6 py-5 space-y-5" x-data="{ createFeeType: 'fixed' }">
                     @csrf
 
-                    <div class="grid grid-cols-2 gap-4">
-                        {{-- Nama --}}
-                        <div class="col-span-2">
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Nama <span
-                                    class="text-red-500">*</span></label>
-                            <input type="text" name="name" required placeholder="cth. BCA Virtual Account"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
+                    {{-- Baris 1: Nama (full width) --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">Nama <span
+                                class="text-red-500">*</span></label>
+                        <input type="text" name="name" required placeholder="cth. BCA Virtual Account"
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                    </div>
 
-                        {{-- Kode --}}
+                    {{-- Baris 2: Kode + Kategori --}}
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Kode <span
                                     class="text-red-500">*</span></label>
                             <input type="text" name="code" required placeholder="cth. BCA_VA"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Kategori --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Kategori <span
                                     class="text-red-500">*</span></label>
@@ -269,36 +282,15 @@
                                 @endforeach
                             </select>
                         </div>
+                    </div>
 
-                        {{-- Provider --}}
+                    {{-- Baris 3: Provider + Status --}}
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Provider</label>
                             <input type="text" name="provider" placeholder="cth. Midtrans"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Nomor Rekening --}}
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Nomor Rekening</label>
-                            <input type="text" name="account_number" placeholder="cth. 1234567890"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
-
-                        {{-- Nama Rekening --}}
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Nama Rekening</label>
-                            <input type="text" name="account_name" placeholder="cth. PT. Toko Online"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
-
-                        {{-- Fee --}}
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Fee (Rp)</label>
-                            <input type="number" name="fee" value="0" min="0"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
-
-                        {{-- Status --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Status <span
                                     class="text-red-500">*</span></label>
@@ -308,13 +300,68 @@
                                 <option value="unavailable">Unavailable</option>
                             </select>
                         </div>
+                    </div>
 
-                        {{-- Upload Logo --}}
-                        <div class="col-span-2">
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Logo / Icon</label>
-                            <input type="file" name="image_url" accept="image/*"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-blue-700 hover:file:bg-blue-100 focus:outline-none">
+                    {{-- Baris 4: Nomor Rekening + Nama Rekening --}}
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Nomor Rekening</label>
+                            <input type="text" name="account_number" placeholder="cth. 1234567890"
+                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Nama Rekening</label>
+                            <input type="text" name="account_name" placeholder="cth. PT. Toko Online"
+                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                        </div>
+                    </div>
+
+                    {{-- Baris 5: Fee section — 3 kolom --}}
+                    <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 space-y-3">
+                        <p class="text-xs font-medium text-gray-600">Konfigurasi Fee</p>
+                        <div class="grid grid-cols-3 gap-4">
+
+                            {{-- Jenis Fee — reactive update step input --}}
+                            <div>
+                                <label class="mb-1.5 block text-xs font-medium text-gray-700">Jenis Fee</label>
+                                <select name="fee_type" x-model="createFeeType"
+                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                                    <option value="fixed">Fixed</option>
+                                    <option value="percent">Percent</option>
+                                </select>
+                            </div>
+
+                            {{-- Nilai Fee — step integer kalau fixed, decimal kalau percent --}}
+                            <div>
+                                <label class="mb-1.5 block text-xs font-medium text-gray-700">
+                                    Nilai Fee
+                                    <span class="text-gray-400 font-normal"
+                                        x-text="createFeeType === 'percent' ? '(%)' : '(Rp)'"></span>
+                                </label>
+                                <input type="number" name="fee_value" value="0" min="0"
+                                    :step="createFeeType === 'percent' ? '0.01' : '1'"
+                                    :placeholder="createFeeType === 'percent' ? 'cth. 2.5' : 'cth. 5000'"
+                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                            </div>
+
+                            {{-- Tipe Pajak --}}
+                            <div>
+                                <label class="mb-1.5 block text-xs font-medium text-gray-700">Tipe Pajak</label>
+                                <select name="fee_tax_type"
+                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                                    <option value="after_tax">Setelah Pajak</option>
+                                    <option value="before_tax">Sebelum Pajak</option>
+                                </select>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    {{-- Baris 6: Upload Logo --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">Logo / Icon</label>
+                        <input type="file" name="image_url" accept="image/*"
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-blue-700 hover:file:bg-blue-100 focus:outline-none">
                     </div>
 
                     {{-- Footer modal --}}
@@ -335,14 +382,14 @@
         {{-- ============================================================
              MODAL EDIT
              ============================================================ --}}
-        <div x-show="showEdit" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <div x-show="showEdit" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
             style="background: rgba(0,0,0,0.35)">
 
             <div @click.outside="showEdit = false"
-                class="w-full max-w-lg rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                class="w-full max-w-2xl rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden my-auto">
 
                 {{-- Modal header --}}
-                <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                     <div>
                         <p class="text-sm font-medium text-gray-900">Edit Metode Pembayaran</p>
                         <p class="text-xs text-gray-400 mt-0.5" x-text="'Mengedit: ' + (editData.name ?? '')"></p>
@@ -357,35 +404,33 @@
                     </button>
                 </div>
 
-                {{-- Form edit — action di-bind dinamis lewat Alpine --}}
+                {{-- Form edit --}}
                 <form :action="`{{ url('admin/payment-methods') }}/${editData.id}`" method="POST"
-                    enctype="multipart/form-data" class="px-5 py-4 space-y-4">
+                    enctype="multipart/form-data" class="px-6 py-5 space-y-5">
                     @csrf
                     @method('PUT')
 
+                    {{-- Baris 1: Nama --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">Nama <span
+                                class="text-red-500">*</span></label>
+                        <input type="text" name="name" :value="editData.name" required
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                    </div>
+
+                    {{-- Baris 2: Kode + Kategori --}}
                     <div class="grid grid-cols-2 gap-4">
-
-                        {{-- Nama --}}
-                        <div class="col-span-2">
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Nama <span
-                                    class="text-red-500">*</span></label>
-                            <input type="text" name="name" :value="editData.name" required
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
-
-                        {{-- Kode --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Kode <span
                                     class="text-red-500">*</span></label>
                             <input type="text" name="code" :value="editData.code" required
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Kategori --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Kategori <span
                                     class="text-red-500">*</span></label>
-                            <select name="category" :value="editData.category" required x-init="$watch('editData.category', v => $el.value = v)"
+                            {{-- x-init $watch untuk sync value select --}}
+                            <select name="category" required x-init="$watch('editData.category', v => $el.value = v)"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                                 <option value="">Pilih kategori</option>
                                 @foreach ($categories as $cat)
@@ -393,36 +438,15 @@
                                 @endforeach
                             </select>
                         </div>
+                    </div>
 
-                        {{-- Provider --}}
+                    {{-- Baris 3: Provider + Status --}}
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Provider</label>
                             <input type="text" name="provider" :value="editData.provider"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Nomor Rekening --}}
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Nomor Rekening</label>
-                            <input type="text" name="account_number" :value="editData.account_number"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
-
-                        {{-- Nama Rekening --}}
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Nama Rekening</label>
-                            <input type="text" name="account_name" :value="editData.account_name"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
-
-                        {{-- Fee --}}
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Fee (Rp)</label>
-                            <input type="number" name="fee" :value="editData.fee" min="0"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
-
-                        {{-- Status --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Status <span
                                     class="text-red-500">*</span></label>
@@ -432,22 +456,75 @@
                                 <option value="unavailable">Unavailable</option>
                             </select>
                         </div>
+                    </div>
 
-                        {{-- Preview & Upload Logo --}}
-                        <div class="col-span-2">
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Logo / Icon</label>
-                            {{-- Preview logo lama --}}
-                            <template x-if="editData.image_url">
-                                <div class="mb-2 flex items-center gap-3">
-                                    <img :src="editData.image_url" alt="Logo saat ini"
-                                        class="h-10 w-10 rounded-lg object-contain border border-gray-100 bg-gray-50 p-1">
-                                    <p class="text-xs text-gray-400">Logo saat ini. Upload baru untuk menggantinya.</p>
-                                </div>
-                            </template>
-                            <input type="file" name="image_url" accept="image/*"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-blue-700 hover:file:bg-blue-100 focus:outline-none">
+                    {{-- Baris 4: Nomor Rekening + Nama Rekening --}}
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Nomor Rekening</label>
+                            <input type="text" name="account_number" :value="editData.account_number"
+                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Nama Rekening</label>
+                            <input type="text" name="account_name" :value="editData.account_name"
+                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                        </div>
+                    </div>
 
+                    {{-- Baris 5: Fee section — reactive step berdasarkan fee_type --}}
+                    <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 space-y-3">
+                        <p class="text-xs font-medium text-gray-600">Konfigurasi Fee</p>
+                        <div class="grid grid-cols-3 gap-4">
+
+                            {{-- Jenis Fee --}}
+                            <div>
+                                <label class="mb-1.5 block text-xs font-medium text-gray-700">Jenis Fee</label>
+                                {{-- x-model ke editData.fee_type agar step input ikut berubah --}}
+                                <select name="fee_type" x-model="editData.fee_type" x-init="$watch('editData.fee_type', v => $el.value = v)"
+                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                                    <option value="fixed">Fixed</option>
+                                    <option value="percent">Percent</option>
+                                </select>
+                            </div>
+
+                            {{-- Nilai Fee — step reaktif --}}
+                            <div>
+                                <label class="mb-1.5 block text-xs font-medium text-gray-700">
+                                    Nilai Fee
+                                    <span class="text-gray-400 font-normal"
+                                        x-text="editData.fee_type === 'percent' ? '(%)' : '(Rp)'"></span>
+                                </label>
+                                <input type="number" name="fee_value" :value="editData.fee_value" min="0"
+                                    :step="editData.fee_type === 'percent' ? '0.01' : '1'"
+                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                            </div>
+
+                            {{-- Tipe Pajak --}}
+                            <div>
+                                <label class="mb-1.5 block text-xs font-medium text-gray-700">Tipe Pajak</label>
+                                <select name="fee_tax_type" x-init="$watch('editData.fee_tax_type', v => $el.value = v)"
+                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                                    <option value="after_tax">Setelah Pajak</option>
+                                    <option value="before_tax">Sebelum Pajak</option>
+                                </select>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    {{-- Baris 6: Preview + Upload Logo --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">Logo / Icon</label>
+                        <template x-if="editData.image_url">
+                            <div class="mb-2 flex items-center gap-3">
+                                <img :src="editData.image_url" alt="Logo saat ini"
+                                    class="h-10 w-10 rounded-lg object-contain border border-gray-100 bg-gray-50 p-1">
+                                <p class="text-xs text-gray-400">Logo saat ini. Upload baru untuk menggantinya.</p>
+                            </div>
+                        </template>
+                        <input type="file" name="image_url" accept="image/*"
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-blue-700 hover:file:bg-blue-100 focus:outline-none">
                     </div>
 
                     {{-- Footer modal --}}
@@ -468,24 +545,19 @@
     </div>
 
     {{-- ================================================================
-         Alpine.js component — satu x-data untuk seluruh halaman
+         Alpine.js component
          ================================================================ --}}
     <script>
         function paymentMethodManager() {
             return {
-                // --- State modal Create ---
                 showCreate: false,
-
-                // --- State modal Edit ---
                 showEdit: false,
                 editData: {},
 
-                // Buka modal Create
                 openCreate() {
                     this.showCreate = true;
                 },
 
-                // Buka modal Edit, isi data dari baris tabel
                 openEdit(data) {
                     this.editData = data;
                     this.showEdit = true;
