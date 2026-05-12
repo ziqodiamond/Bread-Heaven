@@ -7,6 +7,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DeliveryMethodController;
 use App\Http\Controllers\GeneralController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\ProductController;
@@ -71,8 +72,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/{order}/retry', [PaymentController::class, 'retry'])->name('retry');
     });
 
+    Route::prefix('/orders')->name('orders.')->group(function () {
+        Route::get('/', [OrderController::class, 'index'])->name('index');
+        Route::get('/history', [OrderController::class, 'history'])->name('history');
+        Route::get('/{id}', [OrderController::class, 'show'])->name('show');
+        Route::post('/{id}/cancel', [OrderController::class, 'cancel'])->name('cancel');
+    });
+
     Route::prefix('/transaction')->name('transaction.')->group(function () {
-        Route::get('/history', [TransactionController::class, 'history'])->name('history');
+
         Route::get('/{id}', [TransactionController::class, 'show'])->name('show');
     });
 });
@@ -106,6 +114,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:ad
             Route::post('/', [PaymentMethodController::class, 'store'])->name('store');
             Route::get('/{paymentMethod}/edit', [PaymentMethodController::class, 'edit'])->name('edit');
             Route::put('/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('update');
+            Route::patch('/{paymentMethod}/toggle-status', [PaymentMethodController::class, 'toggleStatus'])->name('toggle-status');
             Route::delete('/{paymentMethod}', [PaymentMethodController::class, 'destroy'])->name('destroy');
         });
 
@@ -116,6 +125,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:ad
             Route::get('/{shippingMethod}/edit', [ShippingMethodController::class, 'edit'])->name('edit');
             Route::put('/{shippingMethod}', [ShippingMethodController::class, 'update'])->name('update');
             Route::delete('/{shippingMethod}', [ShippingMethodController::class, 'destroy'])->name('destroy');
+            Route::patch('/{shippingMethod}/toggle-status', [ShippingMethodController::class, 'toggleStatus'])->name('toggle-status');
         });
 
         Route::prefix('stores')->name('stores.')->group(function () {

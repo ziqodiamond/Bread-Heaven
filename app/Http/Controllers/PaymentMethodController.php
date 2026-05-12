@@ -242,13 +242,7 @@ class PaymentMethodController extends Controller
 
             'image_url' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
 
-            /*
-            |--------------------------------------------------------------------------
-            | Status payment
-            |--------------------------------------------------------------------------
-            */
 
-            'status' => 'required|in:available,not_available',
         ]);
 
         /*
@@ -306,6 +300,23 @@ class PaymentMethodController extends Controller
             );
     }
 
+    /**
+     * Toggle status payment method
+     */
+    // PaymentMethodController.php
+    public function toggleStatus(PaymentMethod $paymentMethod)
+    {
+        $paymentMethod->status = $paymentMethod->status === 'available'
+            ? 'unavailable'
+            : 'available';
+
+        $paymentMethod->save();
+
+        return response()->json([
+            'success' => true,
+            'status'  => $paymentMethod->status,
+        ]);
+    }
     /**
      * Delete payment method
      */

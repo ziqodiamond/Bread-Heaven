@@ -7,12 +7,10 @@
             <p class="text-sm text-gray-400 mt-0.5">Kelola semua metode pengiriman yang tersedia</p>
         </div>
 
-
-
         {{-- Card utama --}}
         <div class="rounded-xl border border-gray-100 bg-white overflow-hidden">
 
-            {{-- Card header --}}
+            {{-- Card header: filter + tombol create --}}
             <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
                 <div>
                     <p class="text-sm font-medium text-gray-900">Daftar metode pengiriman</p>
@@ -25,8 +23,8 @@
                         <select name="status" onchange="document.getElementById('filterForm').submit()"
                             class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300">
                             <option value="">Semua Status</option>
-                            <option value="available" {{ request('status') == 'available' ? 'selected' : '' }}>
-                                Available</option>
+                            <option value="available" {{ request('status') == 'available' ? 'selected' : '' }}>Available
+                            </option>
                             <option value="unavailable" {{ request('status') == 'unavailable' ? 'selected' : '' }}>
                                 Unavailable</option>
                         </select>
@@ -73,7 +71,7 @@
                         @forelse ($shippingMethods as $method)
                             <tr class="hover:bg-gray-50 transition-colors">
 
-                                {{-- Kurir: inisial + nama + kode --}}
+                                {{-- Kurir: inisial + nama + provider --}}
                                 <td class="px-5 py-3.5">
                                     <div class="flex items-center gap-3">
                                         <div
@@ -83,15 +81,15 @@
                                         <div>
                                             <p class="font-medium text-gray-900 leading-tight">
                                                 {{ $method->courier_name }}</p>
-                                            <p class="text-[11px] text-gray-400 mt-0.5">
-                                                {{ $method->provider ?? '-' }}</p>
+                                            <p class="text-[11px] text-gray-400 mt-0.5">{{ $method->provider ?? '-' }}
+                                            </p>
                                         </div>
                                     </div>
                                 </td>
 
-                                {{-- Layanan: nama + kode --}}
+                                {{-- Layanan: nama + kode + deskripsi --}}
                                 <td class="px-5 py-3.5">
-                                    <p class="text-gray-700 text-xs font-medium">{{ $method->service_name }}</p>
+                                    <p class="text-xs font-medium text-gray-700">{{ $method->service_name }}</p>
                                     <div class="flex items-center gap-1.5 mt-0.5">
                                         <span
                                             class="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono font-medium text-gray-500">
@@ -119,21 +117,36 @@
                                     @endif
                                 </td>
 
-                                {{-- Badge Status --}}
+                                {{-- Toggle Status — sepenuhnya Alpine reaktif --}}
                                 <td class="px-5 py-3.5">
-                                    @if ($method->status === 'available')
-                                        <span
-                                            class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                                            Available
-                                        </span>
-                                    @else
-                                        <span
-                                            class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-red-400"></span>
-                                            Unavailable
-                                        </span>
-                                    @endif
+                                    <div class="flex items-center gap-3">
+
+                                        {{-- Toggle button --}}
+                                        <button type="button" :disabled="toggling === '{{ $method->id }}'"
+                                            @click="toggleStatus(
+                                                '{{ $method->id }}',
+                                                '{{ route('admin.management.shipping-methods.toggle-status', $method->id) }}'
+                                            )"
+                                            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-wait">
+                                            {{-- Background reaktif --}}
+                                            <span class="absolute inset-0 rounded-full transition-colors duration-200"
+                                                :class="statuses['{{ $method->id }}'] === 'available' ? 'bg-green-500' :
+                                                    'bg-gray-300'"></span>
+
+                                            {{-- Dot reaktif --}}
+                                            <span
+                                                class="relative inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200"
+                                                :class="statuses['{{ $method->id }}'] === 'available' ? 'translate-x-6' :
+                                                    'translate-x-1'"></span>
+                                        </button>
+
+                                        {{-- Label status reaktif --}}
+                                        <span class="text-xs font-medium transition-colors duration-200"
+                                            :class="statuses['{{ $method->id }}'] === 'available' ? 'text-green-700' :
+                                                'text-red-500'"
+                                            x-text="statuses['{{ $method->id }}'] === 'available' ? 'Available' : 'Unavailable'"></span>
+
+                                    </div>
                                 </td>
 
                                 {{-- Aksi --}}
@@ -200,12 +213,16 @@
         {{-- ============================================================
              MODAL CREATE
              ============================================================ --}}
-        <div x-show="showCreate" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <div x-show="showCreate" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
             style="background: rgba(0,0,0,0.35)">
-
-            <div @click.outside="showCreate = false"
-                class="w-full max-w-lg rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-
+            <div @click.outside="showCreate = false" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                class="w-full max-w-lg rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden my-auto">
+                {{-- Modal header --}}
                 <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
                     <div>
                         <p class="text-sm font-medium text-gray-900">Tambah Metode Pengiriman</p>
@@ -221,20 +238,20 @@
                     </button>
                 </div>
 
+                {{-- Form Create --}}
                 <form action="{{ route('admin.management.shipping-methods.store') }}" method="POST"
                     class="px-5 py-4 space-y-4">
                     @csrf
 
+                    {{-- Provider --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">Provider</label>
+                        <input type="text" name="provider" placeholder="cth. Biteship, Raja Ongkir"
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                    </div>
+
+                    {{-- Nama Kurir + Kode Kurir --}}
                     <div class="grid grid-cols-2 gap-4">
-
-                        {{-- Provider --}}
-                        <div class="col-span-2">
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Provider</label>
-                            <input type="text" name="provider" placeholder="cth. Biteship, Raja Ongkir"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
-
-                        {{-- Nama Kurir --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">
                                 Nama Kurir <span class="text-red-500">*</span>
@@ -242,8 +259,6 @@
                             <input type="text" name="courier_name" required placeholder="cth. JNE"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Kode Kurir --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">
                                 Kode Kurir <span class="text-red-500">*</span>
@@ -251,8 +266,10 @@
                             <input type="text" name="courier_code" required placeholder="cth. jne"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
+                    </div>
 
-                        {{-- Nama Layanan --}}
+                    {{-- Nama Layanan + Kode Layanan --}}
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">
                                 Nama Layanan <span class="text-red-500">*</span>
@@ -260,8 +277,6 @@
                             <input type="text" name="service_name" required placeholder="cth. Reguler"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Kode Layanan --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">
                                 Kode Layanan <span class="text-red-500">*</span>
@@ -269,42 +284,42 @@
                             <input type="text" name="service_code" required placeholder="cth. REG"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
+                    </div>
 
-                        {{-- Deskripsi --}}
-                        <div class="col-span-2">
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Deskripsi</label>
-                            <input type="text" name="description" placeholder="cth. Pengiriman standar 2-3 hari"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
+                    {{-- Deskripsi --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">Deskripsi</label>
+                        <input type="text" name="description" placeholder="cth. Pengiriman standar 2-3 hari"
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                    </div>
 
-                        {{-- Estimasi --}}
+                    {{-- Estimasi + Biaya Tambahan --}}
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Estimasi Pengiriman</label>
                             <input type="text" name="estimated_delivery" placeholder="cth. 2-3 hari"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Biaya Tambahan --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Biaya Tambahan (Rp)</label>
                             <input type="number" name="additional_fee" value="0" min="0"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Status --}}
-                        <div class="col-span-2">
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">
-                                Status <span class="text-red-500">*</span>
-                            </label>
-                            <select name="status" required
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                                <option value="available">Available</option>
-                                <option value="unavailable">Unavailable</option>
-                            </select>
-                        </div>
-
                     </div>
 
+                    {{-- Status --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">
+                            Status <span class="text-red-500">*</span>
+                        </label>
+                        <select name="status" required
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                            <option value="available">Available</option>
+                            <option value="unavailable">Unavailable</option>
+                        </select>
+                    </div>
+
+                    {{-- Footer modal --}}
                     <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
                         <button type="button" @click="showCreate = false"
                             class="rounded-lg border border-gray-200 px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
@@ -322,17 +337,21 @@
         {{-- ============================================================
              MODAL EDIT
              ============================================================ --}}
-        <div x-show="showEdit" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <div x-show="showEdit" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
             style="background: rgba(0,0,0,0.35)">
-
-            <div @click.outside="showEdit = false"
-                class="w-full max-w-lg rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-
+            <div @click.outside="showEdit = false" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                class="w-full max-w-lg rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden my-auto">
+                {{-- Modal header --}}
                 <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
                     <div>
                         <p class="text-sm font-medium text-gray-900">Edit Metode Pengiriman</p>
                         <p class="text-xs text-gray-400 mt-0.5"
-                            x-text="'Mengedit: ' + (editData.courier_name ?? '') + ' ' + (editData.service_name ?? '')">
+                            x-text="'Mengedit: ' + (editData.courier_name ?? '') + ' · ' + (editData.service_name ?? '')">
                         </p>
                     </div>
                     <button @click="showEdit = false"
@@ -345,21 +364,21 @@
                     </button>
                 </div>
 
-                <form :action="`{{ url('admin/shipping-methods') }}/${editData.id}`" method="POST"
+                {{-- Form Edit --}}
+                <form :action="`{{ url('admin/management/shipping-methods') }}/${editData.id}`" method="POST"
                     class="px-5 py-4 space-y-4">
                     @csrf
                     @method('PUT')
 
+                    {{-- Provider --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">Provider</label>
+                        <input type="text" name="provider" :value="editData.provider"
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                    </div>
+
+                    {{-- Nama Kurir + Kode Kurir --}}
                     <div class="grid grid-cols-2 gap-4">
-
-                        {{-- Provider --}}
-                        <div class="col-span-2">
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Provider</label>
-                            <input type="text" name="provider" :value="editData.provider"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
-
-                        {{-- Nama Kurir --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">
                                 Nama Kurir <span class="text-red-500">*</span>
@@ -367,8 +386,6 @@
                             <input type="text" name="courier_name" :value="editData.courier_name" required
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Kode Kurir --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">
                                 Kode Kurir <span class="text-red-500">*</span>
@@ -376,8 +393,10 @@
                             <input type="text" name="courier_code" :value="editData.courier_code" required
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
+                    </div>
 
-                        {{-- Nama Layanan --}}
+                    {{-- Nama Layanan + Kode Layanan --}}
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">
                                 Nama Layanan <span class="text-red-500">*</span>
@@ -385,8 +404,6 @@
                             <input type="text" name="service_name" :value="editData.service_name" required
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Kode Layanan --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">
                                 Kode Layanan <span class="text-red-500">*</span>
@@ -394,43 +411,43 @@
                             <input type="text" name="service_code" :value="editData.service_code" required
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
+                    </div>
 
-                        {{-- Deskripsi --}}
-                        <div class="col-span-2">
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Deskripsi</label>
-                            <input type="text" name="description" :value="editData.description"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                        </div>
+                    {{-- Deskripsi --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">Deskripsi</label>
+                        <input type="text" name="description" :value="editData.description"
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                    </div>
 
-                        {{-- Estimasi --}}
+                    {{-- Estimasi + Biaya Tambahan --}}
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Estimasi Pengiriman</label>
                             <input type="text" name="estimated_delivery" :value="editData.estimated_delivery"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Biaya Tambahan --}}
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Biaya Tambahan (Rp)</label>
                             <input type="number" name="additional_fee" :value="editData.additional_fee"
                                 min="0"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-
-                        {{-- Status --}}
-                        <div class="col-span-2">
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">
-                                Status <span class="text-red-500">*</span>
-                            </label>
-                            <select name="status" required x-init="$watch('editData.status', v => $el.value = v)"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                                <option value="available">Available</option>
-                                <option value="unavailable">Unavailable</option>
-                            </select>
-                        </div>
-
                     </div>
 
+                    {{-- Status --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">
+                            Status <span class="text-red-500">*</span>
+                        </label>
+                        <select name="status" required x-init="$watch('editData.status', v => $el.value = v)"
+                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                            <option value="available">Available</option>
+                            <option value="unavailable">Unavailable</option>
+                        </select>
+                    </div>
+
+                    {{-- Footer modal --}}
                     <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
                         <button type="button" @click="showEdit = false"
                             class="rounded-lg border border-gray-200 px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
@@ -447,12 +464,33 @@
 
     </div>
 
+    {{-- ================================================================
+         Alpine.js Component
+         UUID-safe: semua ID dibungkus quotes agar tidak di-parse sebagai
+         ekspresi matematika oleh JavaScript
+         ================================================================ --}}
     <script>
         function shippingMethodManager() {
             return {
                 showCreate: false,
                 showEdit: false,
                 editData: {},
+
+                /**
+                 * State reaktif toggle per ID (UUID-safe — key pakai string)
+                 * Di-inisialisasi dari data server via Blade
+                 */
+                statuses: {
+                    @foreach ($shippingMethods as $method)
+                        '{{ $method->id }}': '{{ $method->status }}',
+                    @endforeach
+                },
+
+                /**
+                 * ID metode yang sedang dalam proses toggle
+                 * Mencegah double-click / race condition
+                 */
+                toggling: null,
 
                 openCreate() {
                     this.showCreate = true;
@@ -462,7 +500,59 @@
                     this.editData = data;
                     this.showEdit = true;
                 },
+
+                /**
+                 * Toggle status metode pengiriman via PATCH request
+                 * Update statuses[id] secara reaktif — UI otomatis re-render
+                 */
+                async toggleStatus(id, url) {
+                    if (this.toggling === id) return;
+                    this.toggling = id;
+
+                    try {
+                        const response = await fetch(url, {
+                            method: 'PATCH',
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                            },
+                        });
+
+                        const text = await response.text();
+
+                        if (!response.ok) {
+                            console.error('[toggleStatus] HTTP', response.status, url);
+                            console.error('[toggleStatus] Body:', text);
+                            alert('Gagal mengubah status (HTTP ' + response.status + '). Cek console untuk detail.');
+                            return;
+                        }
+
+                        let result;
+                        try {
+                            result = JSON.parse(text);
+                        } catch (e) {
+                            console.error('[toggleStatus] Response bukan JSON:', text);
+                            alert('Server mengembalikan response tidak valid.');
+                            return;
+                        }
+
+                        if (result.success) {
+                            // Update state reaktif — UI otomatis re-render tanpa reload
+                            this.statuses[id] = result.status;
+                        } else {
+                            alert('Gagal: ' + (result.message ?? 'Unknown error'));
+                        }
+
+                    } catch (error) {
+                        console.error('[toggleStatus] Network error:', error);
+                        alert('Kesalahan jaringan: ' + error.message);
+                    } finally {
+                        this.toggling = null;
+                    }
+                },
             }
         }
     </script>
+
 </x-layout-admin>

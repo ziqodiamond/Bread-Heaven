@@ -119,4 +119,22 @@ class ShippingMethodController extends Controller
         $shippingMethod->delete();
         return redirect()->back()->with('success', 'Shipping method deleted successfully.');
     }
+
+    /**
+     * Toggle status available <-> unavailable via PATCH
+     * Dipanggil oleh Alpine.js fetch — return JSON
+     */
+    public function toggleStatus(ShippingMethod $shippingMethod)
+    {
+        $shippingMethod->status = $shippingMethod->status === 'available'
+            ? 'unavailable'
+            : 'available';
+
+        $shippingMethod->save();
+
+        return response()->json([
+            'success' => true,
+            'status'  => $shippingMethod->status,
+        ]);
+    }
 }

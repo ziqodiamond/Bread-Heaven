@@ -29,7 +29,6 @@ class PaymentController extends Controller
                     'error' => $result['error'],
                 ], 400);
             }
-
         } catch (\Exception $e) {
             \Log::error('PaymentController::notification error', [
                 'error' => $e->getMessage(),
@@ -43,7 +42,7 @@ class PaymentController extends Controller
     }
 
     /**
-     * Finish callback dari Midtrans (user redirect after payment success)
+     * Finish callback dari Midtrans (user redirect after payment success) 
      */
     public function finish(Order $order)
     {
@@ -53,7 +52,7 @@ class PaymentController extends Controller
 
             $midtransService = app(MidtransService::class);
             $statusResult = $midtransService->getTransactionStatus(
-                $transaction->gateway_transaction_id
+                $transaction->gateway_order_id
             );
 
             if ($statusResult['success']) {
@@ -96,8 +95,13 @@ class PaymentController extends Controller
      */
     public function show(Order $order)
     {
-        // Ensure user is order owner
-        $this->authorize('view', $order);
+        // // Ensure user is order owner
+        // $this->authorize('view', $order);
+
+        abort_if(
+            $order->user_id !== auth()->id(),
+            403
+        );
 
         // Get latest payment transaction
         $transaction = $order->paymentTransactions()->latest()->first();
@@ -134,5 +138,42 @@ class PaymentController extends Controller
 
         // Redirect ke Midtrans Snap
         return redirect($paymentResult['redirect_url']);
+    }
+
+    public function markAsExpired(
+        array $payload = []
+    ): void {
+
+        $this->update([
+
+            'transaction_status' => 'expire',
+
+            'payload' => $payload,
+        ]);
+
+        /*
+    |--------------------------------------------------------------------------
+    | Update order
+    |--------------------------------------------------------------------------
+    */
+
+        $this->order?->update([
+
+            'payment_status' => 'expired',
+        ]);
+
+        /*
+    |--------------------------------------------------------------------------
+    | Balikin stok
+    |--------------------------------------------------------------------------
+    */
+
+        foreach ($this->order?->items ?? [] as $item) {
+
+            $item->product?->increment(
+                'stock',
+                $item->quantity
+            );
+        }
     }
 }

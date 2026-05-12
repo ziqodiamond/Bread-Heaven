@@ -122,11 +122,10 @@
                                     {{ $method->account_number ?? '-' }}
                                 </td>
 
-                                {{-- Fee — warna seragam semua pakai text-gray-700 --}}
+                                {{-- Fee --}}
                                 <td class="px-5 py-3.5">
                                     @if ($method->fee_value > 0)
                                         <div class="space-y-0.5">
-                                            {{-- Nilai fee --}}
                                             <p class="text-xs font-medium text-gray-700">
                                                 @if ($method->fee_type === 'percent')
                                                     {{ rtrim(rtrim(number_format($method->fee_value, 2, '.', ''), '0'), '.') }}%
@@ -134,7 +133,6 @@
                                                     Rp {{ number_format($method->fee_value, 0, ',', '.') }}
                                                 @endif
                                             </p>
-                                            {{-- Label jenis + pajak --}}
                                             <p class="text-[11px] text-gray-400">
                                                 {{ $method->fee_type === 'percent' ? 'Persentase' : 'Fixed' }}
                                                 &bull;
@@ -146,26 +144,42 @@
                                     @endif
                                 </td>
 
-                                {{-- Badge Status --}}
+                                {{-- Toggle Status — sepenuhnya Alpine reaktif --}}
                                 <td class="px-5 py-3.5">
-                                    @if ($method->status === 'available')
-                                        <span
-                                            class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                                            Available
-                                        </span>
-                                    @else
-                                        <span
-                                            class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-red-400"></span>
-                                            Unavailable
-                                        </span>
-                                    @endif
+                                    <div class="flex items-center gap-3">
+
+                                        {{-- Toggle button --}}
+                                        <button type="button" :disabled="toggling === '{{ $method->id }}'"
+                                            @click="toggleStatus(
+                                                '{{ $method->id }}',
+                                                '{{ route('admin.management.payment-methods.toggle-status', $method->id) }}'
+                                            )"
+                                            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-wait">
+                                            {{-- Background reaktif --}}
+                                            <span class="absolute inset-0 rounded-full transition-colors duration-200"
+                                                :class="statuses['{{ $method->id }}'] === 'available' ? 'bg-green-500' :
+                                                    'bg-gray-300'"></span>
+
+                                            {{-- Dot reaktif --}}
+                                            <span
+                                                class="relative inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200"
+                                                :class="statuses['{{ $method->id }}'] === 'available' ? 'translate-x-6' :
+                                                    'translate-x-1'"></span>
+                                        </button>
+
+                                        {{-- Label status reaktif --}}
+                                        <span class="text-xs font-medium transition-colors duration-200"
+                                            :class="statuses['{{ $method->id }}'] === 'available' ? 'text-green-700' :
+                                                'text-red-500'"
+                                            x-text="statuses['{{ $method->id }}'] === 'available' ? 'Available' : 'Unavailable'"></span>
+
+                                    </div>
                                 </td>
 
                                 {{-- Aksi --}}
                                 <td class="px-5 py-3.5">
                                     <div class="flex items-center gap-2">
+
                                         {{-- Edit --}}
                                         <button
                                             @click="openEdit({{ json_encode([
@@ -180,7 +194,6 @@
                                                 'fee_value' => $method->fee_value,
                                                 'fee_tax_type' => $method->fee_tax_type,
                                                 'image_url' => $method->image_url,
-                                                'status' => $method->status,
                                             ]) }})"
                                             class="inline-flex items-center gap-1.5 rounded-lg border border-blue-100 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none"
@@ -226,14 +239,16 @@
 
         {{-- ============================================================
              MODAL CREATE
-             Modal: max-w-2xl (lebih lebar), max-h + overflow-y-auto agar scrollable
              ============================================================ --}}
-        <div x-show="showCreate" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+        <div x-show="showCreate" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
             style="background: rgba(0,0,0,0.35)">
-
-            <div @click.outside="showCreate = false"
+            <div @click.outside="showCreate = false" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
                 class="w-full max-w-2xl rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden my-auto">
-
                 {{-- Modal header --}}
                 <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                     <div>
@@ -250,30 +265,33 @@
                     </button>
                 </div>
 
-                {{-- Form --}}
+                {{-- Form Create --}}
                 <form action="{{ route('admin.management.payment-methods.store') }}" method="POST"
                     enctype="multipart/form-data" class="px-6 py-5 space-y-5" x-data="{ createFeeType: 'fixed' }">
                     @csrf
 
-                    {{-- Baris 1: Nama (full width) --}}
+                    {{-- Nama --}}
                     <div>
-                        <label class="mb-1.5 block text-xs font-medium text-gray-700">Nama <span
-                                class="text-red-500">*</span></label>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">
+                            Nama <span class="text-red-500">*</span>
+                        </label>
                         <input type="text" name="name" required placeholder="cth. BCA Virtual Account"
                             class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                     </div>
 
-                    {{-- Baris 2: Kode + Kategori --}}
+                    {{-- Kode + Kategori --}}
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Kode <span
-                                    class="text-red-500">*</span></label>
+                            <label class="mb-1.5 block text-xs font-medium text-gray-700">
+                                Kode <span class="text-red-500">*</span>
+                            </label>
                             <input type="text" name="code" required placeholder="cth. BCA_VA"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Kategori <span
-                                    class="text-red-500">*</span></label>
+                            <label class="mb-1.5 block text-xs font-medium text-gray-700">
+                                Kategori <span class="text-red-500">*</span>
+                            </label>
                             <select name="category" required
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                                 <option value="">Pilih kategori</option>
@@ -284,7 +302,7 @@
                         </div>
                     </div>
 
-                    {{-- Baris 3: Provider + Status --}}
+                    {{-- Provider + Status --}}
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Provider</label>
@@ -292,8 +310,9 @@
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Status <span
-                                    class="text-red-500">*</span></label>
+                            <label class="mb-1.5 block text-xs font-medium text-gray-700">
+                                Status <span class="text-red-500">*</span>
+                            </label>
                             <select name="status" required
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                                 <option value="available">Available</option>
@@ -302,7 +321,7 @@
                         </div>
                     </div>
 
-                    {{-- Baris 4: Nomor Rekening + Nama Rekening --}}
+                    {{-- Nomor Rekening + Nama Rekening --}}
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Nomor Rekening</label>
@@ -316,12 +335,12 @@
                         </div>
                     </div>
 
-                    {{-- Baris 5: Fee section — 3 kolom --}}
+                    {{-- Konfigurasi Fee --}}
                     <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 space-y-3">
                         <p class="text-xs font-medium text-gray-600">Konfigurasi Fee</p>
                         <div class="grid grid-cols-3 gap-4">
 
-                            {{-- Jenis Fee — reactive update step input --}}
+                            {{-- Jenis Fee --}}
                             <div>
                                 <label class="mb-1.5 block text-xs font-medium text-gray-700">Jenis Fee</label>
                                 <select name="fee_type" x-model="createFeeType"
@@ -331,7 +350,7 @@
                                 </select>
                             </div>
 
-                            {{-- Nilai Fee — step integer kalau fixed, decimal kalau percent --}}
+                            {{-- Nilai Fee --}}
                             <div>
                                 <label class="mb-1.5 block text-xs font-medium text-gray-700">
                                     Nilai Fee
@@ -357,7 +376,7 @@
                         </div>
                     </div>
 
-                    {{-- Baris 6: Upload Logo --}}
+                    {{-- Upload Logo --}}
                     <div>
                         <label class="mb-1.5 block text-xs font-medium text-gray-700">Logo / Icon</label>
                         <input type="file" name="image_url" accept="image/*"
@@ -382,12 +401,15 @@
         {{-- ============================================================
              MODAL EDIT
              ============================================================ --}}
-        <div x-show="showEdit" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+        <div x-show="showEdit" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
             style="background: rgba(0,0,0,0.35)">
-
-            <div @click.outside="showEdit = false"
+            <div @click.outside="showEdit = false" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
                 class="w-full max-w-2xl rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden my-auto">
-
                 {{-- Modal header --}}
                 <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                     <div>
@@ -404,32 +426,35 @@
                     </button>
                 </div>
 
-                {{-- Form edit --}}
-                <form :action="`{{ url('admin/payment-methods') }}/${editData.id}`" method="POST"
+                {{-- Form Edit --}}
+                <form :action="`{{ url('admin/management/payment-methods') }}/${editData.id}`" method="POST"
                     enctype="multipart/form-data" class="px-6 py-5 space-y-5">
                     @csrf
                     @method('PUT')
 
-                    {{-- Baris 1: Nama --}}
+                    {{-- Nama --}}
                     <div>
-                        <label class="mb-1.5 block text-xs font-medium text-gray-700">Nama <span
-                                class="text-red-500">*</span></label>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700">
+                            Nama <span class="text-red-500">*</span>
+                        </label>
                         <input type="text" name="name" :value="editData.name" required
                             class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                     </div>
 
-                    {{-- Baris 2: Kode + Kategori --}}
+                    {{-- Kode + Kategori --}}
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Kode <span
-                                    class="text-red-500">*</span></label>
+                            <label class="mb-1.5 block text-xs font-medium text-gray-700">
+                                Kode <span class="text-red-500">*</span>
+                            </label>
                             <input type="text" name="code" :value="editData.code" required
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Kategori <span
-                                    class="text-red-500">*</span></label>
-                            {{-- x-init $watch untuk sync value select --}}
+                            <label class="mb-1.5 block text-xs font-medium text-gray-700">
+                                Kategori <span class="text-red-500">*</span>
+                            </label>
+                            {{-- x-init + $watch untuk sync value select saat editData berubah --}}
                             <select name="category" required x-init="$watch('editData.category', v => $el.value = v)"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                                 <option value="">Pilih kategori</option>
@@ -440,25 +465,17 @@
                         </div>
                     </div>
 
-                    {{-- Baris 3: Provider + Status --}}
+                    {{-- Provider + Status --}}
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Provider</label>
                             <input type="text" name="provider" :value="editData.provider"
                                 class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                         </div>
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-gray-700">Status <span
-                                    class="text-red-500">*</span></label>
-                            <select name="status" required x-init="$watch('editData.status', v => $el.value = v)"
-                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                                <option value="available">Available</option>
-                                <option value="unavailable">Unavailable</option>
-                            </select>
-                        </div>
+
                     </div>
 
-                    {{-- Baris 4: Nomor Rekening + Nama Rekening --}}
+                    {{-- Nomor Rekening + Nama Rekening --}}
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-gray-700">Nomor Rekening</label>
@@ -472,15 +489,14 @@
                         </div>
                     </div>
 
-                    {{-- Baris 5: Fee section — reactive step berdasarkan fee_type --}}
+                    {{-- Konfigurasi Fee --}}
                     <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 space-y-3">
                         <p class="text-xs font-medium text-gray-600">Konfigurasi Fee</p>
                         <div class="grid grid-cols-3 gap-4">
 
-                            {{-- Jenis Fee --}}
+                            {{-- Jenis Fee — x-model ke editData.fee_type agar step input ikut reaktif --}}
                             <div>
                                 <label class="mb-1.5 block text-xs font-medium text-gray-700">Jenis Fee</label>
-                                {{-- x-model ke editData.fee_type agar step input ikut berubah --}}
                                 <select name="fee_type" x-model="editData.fee_type" x-init="$watch('editData.fee_type', v => $el.value = v)"
                                     class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
                                     <option value="fixed">Fixed</option>
@@ -488,7 +504,7 @@
                                 </select>
                             </div>
 
-                            {{-- Nilai Fee — step reaktif --}}
+                            {{-- Nilai Fee — step reaktif dari editData.fee_type --}}
                             <div>
                                 <label class="mb-1.5 block text-xs font-medium text-gray-700">
                                     Nilai Fee
@@ -513,7 +529,7 @@
                         </div>
                     </div>
 
-                    {{-- Baris 6: Preview + Upload Logo --}}
+                    {{-- Preview + Upload Logo --}}
                     <div>
                         <label class="mb-1.5 block text-xs font-medium text-gray-700">Logo / Icon</label>
                         <template x-if="editData.image_url">
@@ -545,7 +561,8 @@
     </div>
 
     {{-- ================================================================
-         Alpine.js component
+         Alpine.js Component — satu script, semua logika di sini
+         Vanilla JS DOMContentLoaded dihapus, toggle pakai Alpine reaktif
          ================================================================ --}}
     <script>
         function paymentMethodManager() {
@@ -553,6 +570,22 @@
                 showCreate: false,
                 showEdit: false,
                 editData: {},
+
+                /**
+                 * State reaktif toggle per ID metode pembayaran
+                 * Di-inisialisasi dari data server via Blade
+                 */
+                statuses: {
+                    @foreach ($paymentMethods as $method)
+                        '{{ $method->id }}': '{{ $method->status }}',
+                    @endforeach
+                },
+
+                /**
+                 * ID metode yang sedang dalam proses toggle
+                 * Mencegah double-click / race condition
+                 */
+                toggling: null,
 
                 openCreate() {
                     this.showCreate = true;
@@ -562,7 +595,49 @@
                     this.editData = data;
                     this.showEdit = true;
                 },
+
+                /**
+                 * Toggle status metode pembayaran via PATCH request
+                 * Update statuses[id] secara reaktif — UI otomatis re-render
+                 */
+                async toggleStatus(id, url) {
+                    // Jika sedang diproses, abaikan klik
+                    if (this.toggling === id) return;
+
+                    this.toggling = id;
+
+                    try {
+                        const response = await fetch(url, {
+                            method: 'PATCH',
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json',
+                            },
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            // Update state — Alpine reaktif, UI langsung berubah
+                            this.statuses[id] = result.status;
+                        } else {
+                            alert('Gagal mengubah status. Silakan coba lagi.');
+                        }
+
+                    } catch (error) {
+                        alert('Terjadi kesalahan koneksi. Silakan coba lagi.');
+                        console.error('[toggleStatus] Error:', error);
+                    } finally {
+                        // Selalu release lock, baik sukses maupun gagal
+                        this.toggling = null;
+                    }
+                },
             }
         }
     </script>
+
 </x-layout-admin>

@@ -46,15 +46,48 @@ class MidtransService
                 'first_name' => $order->user?->name ?? $order->customer_name,
                 'email' => $order->user?->email ?? $order->customer_email,
                 'phone' => $order->user?->phone ?? $order->customer_phone,
+
+                'shipping_address' => [
+                    'first_name' => $order->shipping_receiver_name,
+                    'phone' => $order->shipping_receiver_phone,
+                    'address' => $order->shipping_full_address,
+                    'city' => $order->shipping_city,
+                    'postal_code' => $order->shipping_postal_code,
+                ],
             ];
+
+            /*
+|--------------------------------------------------------------------------
+| Enabled Payments
+|--------------------------------------------------------------------------
+*/
+
+            $paymentMethod = $order->paymentMethod;
+
+            $enabledPayments = [];
+
+            if ($paymentMethod?->provider === 'midtrans') {
+
+                $enabledPayments = explode(
+                    ',',
+                    $paymentMethod->code
+                );
+            }
 
             // Prepare item details
             $itemDetails = $order->items->map(function ($item) {
+
                 return [
+
                     'id' => $item->product_id,
-                    'price' => (int) $item->price,
+
+                    // Harga snapshot order item
+                    'price' => (int) $item->product_price,
+
                     'quantity' => (int) $item->quantity,
-                    'name' => $item->product?->name ?? 'Product',
+
+                    // Nama snapshot order item
+                    'name' => $item->product_name,
                 ];
             })->toArray();
 
@@ -82,7 +115,7 @@ class MidtransService
             if ($order->discount_amount > 0) {
                 $itemDetails[] = [
                     'id' => 'discount',
-                    'price' => -((int) $order->discount_amount),
+                    'price' => - ((int) $order->discount_amount),
                     'quantity' => 1,
                     'name' => 'Diskon',
                 ];
@@ -98,7 +131,7 @@ class MidtransService
                     'unfinish' => route('payment.unfinish', $order->id),
                     'error' => route('payment.error', $order->id),
                 ],
-                'enabled_payments' => config('services.midtrans.enabled_payments', []),
+                'enabled_payments' => $enabledPayments,
             ];
 
             // Get Snap Token
@@ -136,7 +169,6 @@ class MidtransService
                 'redirect_url' => $snapRedirectUrl,
                 'transaction' => $transaction,
             ];
-
         } catch (\Exception $e) {
             Log::error('Midtrans transaction error', [
                 'order_id' => $order->id,
@@ -221,7 +253,6 @@ class MidtransService
                 'success' => true,
                 'transaction' => $transaction,
             ];
-
         } catch (\Exception $e) {
             Log::error('Midtrans notification error', [
                 'error' => $e->getMessage(),
@@ -271,7 +302,6 @@ class MidtransService
                 'data' => $status,
                 'status' => $status->transaction_status,
             ];
-
         } catch (\Exception $e) {
             Log::error('Midtrans get status error', [
                 'error' => $e->getMessage(),
@@ -298,7 +328,6 @@ class MidtransService
             return [
                 'success' => true,
             ];
-
         } catch (\Exception $e) {
             Log::error('Midtrans cancel error', [
                 'error' => $e->getMessage(),

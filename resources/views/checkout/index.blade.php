@@ -572,7 +572,7 @@
             @csrf
             <input type="hidden" name="delivery_mode" :value="deliveryMode">
             <input type="hidden" name="user_address_id" :value="selectedAddress">
-            <input type="hidden" name="shipping_option_id" :value="selectedShipping">
+            <input type="hidden" name="shipping_rate_id" :value="selectedShipping">
             <input type="hidden" name="payment_method_id" :value="selectedPayment">
             <input type="hidden" name="checkout_mode" value="{{ $checkoutMode }}">
 

@@ -114,10 +114,10 @@
 
             @auth
                 {{-- Riwayat Transaksi --}}
-                <a href="{{ route('transaction.history') }}"
+                <a href="{{ route('orders.history') }}"
                     class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium
                            transition-colors
-                           {{ request()->routeIs('transaction.history') ? 'bg-blue-500/25 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white' }}">
+                           {{ request()->routeIs('orders.history') ? 'bg-blue-500/25 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white' }}">
                     <svg class="w-4.5 h-4.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8"
                         stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                         <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
@@ -240,9 +240,9 @@
 
                         @auth
                             {{-- Riwayat --}}
-                            <a href="{{ route('transaction.history') }}"
+                            <a href="{{ route('orders.history') }}"
                                 class="px-3.5 py-1.5 rounded-lg text-[13.5px] font-medium transition-all duration-150
-                                       {{ request()->routeIs('transaction.history') ? 'bg-white/15 text-white' : 'text-white/70 hover:text-white hover:bg-white/10' }}">
+                                       {{ request()->routeIs('orders.history') ? 'bg-white/15 text-white' : 'text-white/70 hover:text-white hover:bg-white/10' }}">
                                 Riwayat
                             </a>
                         @endauth
@@ -385,7 +385,7 @@
                                         <i class="ti ti-user text-blue-400" style="font-size:16px"></i>
                                         Profil Saya
                                     </a>
-                                    <a href="{{ route('transaction.history') }}" role="menuitem"
+                                    <a href="{{ route('orders.history') }}" role="menuitem"
                                         class="flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-gray-700
                                                hover:bg-blue-50 hover:text-[#0f3460] transition-colors">
                                         <i class="ti ti-shopping-bag text-blue-400" style="font-size:16px"></i>
