@@ -4,8 +4,13 @@
     CHECKOUT PAGE
     - Data toko dari model Store (nama, alamat, jam operasional, maps)
     - Payment methods dari DB grouped by category + image_url support
-    - Shipping methods via AJAX /checkout/shipping-rates (Biteship-ready)
-    - Alpine x-data dengan window.__vars untuk menghindari CSP eval error
+    - Shipping rates via fetch /checkout/shipping-rates (Biteship real-time + cache)
+    - Alpine x-data dengan window.__checkoutData untuk menghindari CSP eval error
+
+    PERUBAHAN PENTING:
+    - Hidden field: shipping_rate_id → shipping_method_id (referensi ke ShippingMethod)
+    - Tambahan hidden field: courier_code, service_code (untuk verifikasi ulang di store())
+    - ShippingRate TIDAK dibuat di endpoint, hanya setelah Order confirmed
 --}}
 
     <style>
@@ -415,12 +420,13 @@
         }
     </style>
 
-    {{-- ============================================================
-         FIX CSP EVAL ERROR:
-         Semua data PHP di-pass lewat window.__vars di <script> tag biasa,
-         bukan di-embed langsung di dalam string atribut x-data="{ ... }".
-         Alpine.js tidak perlu eval() untuk membaca property dari object JS.
-    ============================================================ --}}
+    {{--
+    ============================================================
+    FIX CSP EVAL ERROR:
+    Semua data PHP di-pass lewat window.__checkoutData,
+    bukan di-embed langsung di string atribut x-data="{ ... }".
+    ============================================================
+    --}}
     @php
         $paymentFeesData = $paymentMethods
             ->mapWithKeys(
@@ -449,15 +455,28 @@
     <div class="checkout-root mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8" x-data="{
     
         deliveryMode: 'delivery',
+    
+        // Alamat yang dipilih (id)
         selectedAddress: null,
+    
+        /*
+         * selectedShipping = ShippingMethod->id (bukan ShippingRate->id)
+         * Konsisten dengan flow baru: form kirim shipping_method_id
+         */
         selectedShipping: null,
         shippingPrice: 0,
         shippingRates: [],
         loadingRates: false,
+    
+        // Detail rate yang dipilih (untuk hidden field tambahan)
+        selectedShippingCourierCode: '',
+        selectedShippingServiceCode: '',
+    
         selectedPayment: null,
         subtotal: 0,
         totalWeight: 0,
         paymentFees: {},
+        selectedShippingIsFree: false,
     
         get paymentFee() {
             if (!this.selectedPayment) return 0;
@@ -502,20 +521,32 @@
         },
     
         get total() {
-            return this.subtotal + (this.deliveryMode === 'delivery' ? this.shippingPrice : 0) + this.paymentFee;
+            return this.subtotal +
+                (this.deliveryMode === 'delivery' ? this.shippingPrice : 0) +
+                this.paymentFee;
         },
     
         get canSubmit() {
             if (this.deliveryMode === 'pickup') return this.selectedPayment !== null;
-            return this.selectedAddress !== null && this.selectedShipping !== null && this.selectedPayment !== null;
+            return this.selectedAddress !== null &&
+                this.selectedShipping !== null &&
+                this.selectedPayment !== null;
         },
     
         selectAddress(id) {
             this.selectedAddress = id;
+            // Reset pilihan shipping setiap ganti alamat
+            this.resetShipping();
+            this.fetchRates(id);
+        },
+    
+        resetShipping() {
             this.selectedShipping = null;
             this.shippingPrice = 0;
             this.shippingRates = [];
-            this.fetchRates(id);
+            this.selectedShippingCourierCode = '';
+            this.selectedShippingServiceCode = '';
+            this.selectedShippingIsFree = false;
         },
     
         async fetchRates(addressId) {
@@ -533,21 +564,29 @@
                     }
                 );
                 const data = await res.json();
-                console.log(data);
                 if (!res.ok) throw data;
                 this.shippingRates = data.rates ?? [];
             } catch (e) {
-                console.error('DETAIL ERROR ONGKIR:', e);
-                alert(e.error ?? e.message ?? 'Gagal fetch ongkir');
+                console.error('Gagal fetch ongkir:', e);
+                alert(e.error ?? e.message ?? 'Gagal mengambil data ongkir');
                 this.shippingRates = [];
             } finally {
                 this.loadingRates = false;
             }
         },
     
+        /*
+         * Saat user pilih rate:
+         * - selectedShipping    = rate.id (ShippingMethod->id)
+         * - courier_code & service_code disimpan untuk dikirim ke form
+         *   → dipakai controller untuk verifikasi ulang harga ke Biteship
+         */
         selectShipping(rate) {
             this.selectedShipping = rate.id;
             this.shippingPrice = rate.price;
+            this.selectedShippingCourierCode = rate.courier_code ?? '';
+            this.selectedShippingServiceCode = rate.service_code ?? '';
+            this.selectedShippingIsFree = (rate.price === 0);
         },
     
         formatRp(val) {
@@ -555,13 +594,13 @@
         },
     
         init() {
-            // Ambil semua data dari window.__checkoutData (tidak perlu eval)
             const d = window.__checkoutData ?? {};
             this.paymentFees = d.paymentFees ?? {};
             this.selectedAddress = d.selectedAddress ?? null;
             this.subtotal = d.subtotal ?? 0;
             this.totalWeight = d.totalWeight ?? 0;
     
+            // Auto-fetch ongkir jika sudah ada alamat default
             if (this.deliveryMode === 'delivery' && this.selectedAddress) {
                 this.fetchRates(this.selectedAddress);
             }
@@ -570,10 +609,34 @@
 
         <form action="{{ route('checkout.store') }}" method="POST">
             @csrf
+
+            {{-- Mode pengiriman --}}
             <input type="hidden" name="delivery_mode" :value="deliveryMode">
+
+            {{-- Alamat terpilih --}}
             <input type="hidden" name="user_address_id" :value="selectedAddress">
-            <input type="hidden" name="shipping_rate_id" :value="selectedShipping">
+
+            {{--
+            ================================================================
+            PERUBAHAN: shipping_rate_id → shipping_method_id
+            Controller menerima ShippingMethod->id, bukan ShippingRate->id.
+            ShippingRate dibuat di store() setelah Order berhasil dibuat.
+            ================================================================
+            --}}
+            <input type="hidden" name="shipping_method_id" :value="selectedShipping">
+
+            {{--
+            courier_code & service_code:
+            Dipakai controller untuk mencocokkan rate dari cache Biteship.
+            Mencegah user manipulasi harga dari front-end.
+            --}}
+            <input type="hidden" name="courier_code" :value="selectedShippingCourierCode">
+            <input type="hidden" name="service_code" :value="selectedShippingServiceCode">
+
+            {{-- Payment --}}
             <input type="hidden" name="payment_method_id" :value="selectedPayment">
+
+            {{-- Mode checkout (cart / buy_now) --}}
             <input type="hidden" name="checkout_mode" value="{{ $checkoutMode }}">
 
             {{-- ========================= HEADER ========================= --}}
@@ -595,10 +658,26 @@
                                     ?.offsetWidth ?? 0) + 'px'">
                         </div>
                         <span x-ref="optDelivery" class="toggle-option" :class="{ active: deliveryMode === 'delivery' }"
-                            @click="deliveryMode = 'delivery'">🚚 Diantar</span>
+                            @click="deliveryMode = 'delivery'" style="display:inline-flex;align-items:center;gap:6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+                                <rect x="1" y="3" width="15" height="13" rx="2" />
+                                <path d="M16 8h4l3 5v4h-7V8z" />
+                                <circle cx="5.5" cy="18.5" r="2.5" />
+                                <circle cx="18.5" cy="18.5" r="2.5" />
+                            </svg>
+                            Diantar
+                        </span>
                         <span x-ref="optPickup" class="toggle-option" :class="{ active: deliveryMode === 'pickup' }"
-                            @click="deliveryMode = 'pickup'; selectedShipping = null; shippingPrice = 0;">🏪 Ambil
-                            Sendiri</span>
+                            @click="deliveryMode = 'pickup'; resetShipping();"
+                            style="display:inline-flex;align-items:center;gap:6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                                <polyline points="9 22 9 12 15 12 15 22" />
+                            </svg>
+                            Ambil Sendiri
+                        </span>
                     </div>
                 @endif
             </div>
@@ -626,12 +705,16 @@
                                     <div class="flex flex-1 flex-col justify-between">
                                         <div>
                                             <p class="text-sm font-medium text-gray-900 dark:text-white leading-snug">
-                                                {{ $item->product_name }}</p>
-                                            <p class="mt-1 text-xs text-gray-400">{{ $item->quantity }} pcs &middot;
-                                                {{ number_format($item->total_weight / 1000, 2) }} kg</p>
+                                                {{ $item->product_name }}
+                                            </p>
+                                            <p class="mt-1 text-xs text-gray-400">
+                                                {{ $item->quantity }} pcs &middot;
+                                                {{ number_format($item->total_weight / 1000, 2) }} kg
+                                            </p>
                                         </div>
-                                        <p class="text-sm font-semibold text-gray-900 dark:text-white">Rp
-                                            {{ number_format($item->subtotal, 0, ',', '.') }}</p>
+                                        <p class="text-sm font-semibold text-gray-900 dark:text-white">
+                                            Rp {{ number_format($item->subtotal, 0, ',', '.') }}
+                                        </p>
                                     </div>
                                 </div>
                             @endforeach
@@ -655,8 +738,9 @@
                                     <h2>Alamat Pengiriman</h2>
                                 </div>
                                 <a href="{{ route('address.index') }}"
-                                    class="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">+
-                                    Tambah</a>
+                                    class="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                                    + Tambah
+                                </a>
                             </div>
                             <div class="p-6">
                                 @if ($addresses->isEmpty())
@@ -667,9 +751,10 @@
                                             <circle cx="12" cy="10" r="2" />
                                         </svg>
                                         <p class="text-sm text-gray-400">Belum ada alamat pengiriman</p>
-                                        <a href="{{ route('profile.edit') }}"
-                                            class="inline-flex rounded-xl bg-gray-900 px-5 py-2.5 text-xs font-medium text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 transition-colors">Tambah
-                                            Alamat</a>
+                                        <a href="{{ route('address.index') }}"
+                                            class="inline-flex rounded-xl bg-gray-900 px-5 py-2.5 text-xs font-medium text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 transition-colors">
+                                            Tambah Alamat
+                                        </a>
                                     </div>
                                 @else
                                     <div class="address-scroll">
@@ -684,16 +769,20 @@
                                                 <div class="flex-1 min-w-0">
                                                     <div class="flex items-center gap-2 flex-wrap">
                                                         <span
-                                                            class="text-sm font-medium text-gray-900 dark:text-white">{{ $address->receiver_name }}</span>
+                                                            class="text-sm font-medium text-gray-900 dark:text-white">
+                                                            {{ $address->receiver_name }}
+                                                        </span>
                                                         @if ($address->is_default)
                                                             <span class="badge-utama">Utama</span>
                                                         @endif
                                                     </div>
                                                     <p class="mt-0.5 text-xs text-gray-400">
-                                                        {{ $address->receiver_phone }}</p>
+                                                        {{ $address->receiver_phone }}
+                                                    </p>
                                                     <p
                                                         class="mt-2 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                                                        {{ $address->full_address_text }}</p>
+                                                        {{ $address->full_address_text }}
+                                                    </p>
                                                 </div>
                                             </div>
                                         @endforeach
@@ -712,8 +801,9 @@
                                     <div class="step-num">3</div>
                                     <h2>Metode Pengiriman</h2>
                                 </div>
-                                <span class="text-xs text-gray-400">{{ number_format($totalWeight / 1000, 2) }}
-                                    kg</span>
+                                <span class="text-xs text-gray-400">
+                                    {{ number_format($totalWeight / 1000, 2) }} kg
+                                </span>
                             </div>
                             <div class="p-6">
 
@@ -742,6 +832,11 @@
                                                     x-text="rate.name"></p>
                                                 <p class="text-xs text-gray-400 mt-0.5"
                                                     x-text="rate.etd ? 'Estimasi tiba ' + rate.etd : ''"></p>
+                                                {{-- Badge provider --}}
+                                                <span x-show="rate.provider === 'biteship'"
+                                                    class="mt-1 inline-block text-[10px] font-semibold uppercase tracking-wider text-blue-400">
+                                                    via Biteship
+                                                </span>
                                             </div>
                                             <span
                                                 class="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap"
@@ -752,6 +847,7 @@
 
                             </div>
                         </div>
+
                     </div>{{-- end delivery --}}
 
                     {{-- ============= PICKUP MODE ============= --}}
@@ -784,10 +880,12 @@
                                             </div>
                                             <div>
                                                 <p class="text-sm font-medium text-gray-900 dark:text-white">
-                                                    {{ $store->name }}</p>
+                                                    {{ $store->name }}
+                                                </p>
                                                 <p
                                                     class="mt-1 text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                                                    {{ $store->full_address_text }}</p>
+                                                    {{ $store->full_address_text }}
+                                                </p>
                                                 @if ($store->phone)
                                                     <p class="mt-1 text-xs text-gray-400">{{ $store->phone }}</p>
                                                 @endif
@@ -805,6 +903,7 @@
                                                 Lihat di Google Maps
                                             </a>
                                         @endif
+
                                         <p class="mt-3 text-xs text-gray-400 leading-relaxed">
                                             Tunjukkan bukti pembayaran dan nomor pesanan saat mengambil ke toko.
                                         </p>
@@ -864,7 +963,8 @@
                                             </div>
                                             <div class="flex-1">
                                                 <p class="text-sm font-medium text-gray-900 dark:text-white">
-                                                    {{ $pm->name }}</p>
+                                                    {{ $pm->name }}
+                                                </p>
                                                 <p class="mt-0.5 text-xs text-gray-400">
                                                     {{ ucfirst($pm->provider) }}
                                                     @if ($pm->account_number)
@@ -876,7 +976,8 @@
                                             <span class="text-xs font-medium whitespace-nowrap"
                                                 :class="calcFeeFor('{{ $pm->id }}') === 0 ?
                                                     'text-green-600 dark:text-green-400' : 'text-amber-500'"
-                                                x-text="feeLabel('{{ $pm->id }}')"></span>
+                                                x-text="feeLabel('{{ $pm->id }}')">
+                                            </span>
                                         </div>
                                     @endforeach
                                 </div>
@@ -917,7 +1018,8 @@
                                             style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid #f0efe9;">
                                         <div class="flex-1 min-w-0">
                                             <p class="text-xs text-gray-700 dark:text-gray-300 truncate">
-                                                {{ $item->product_name }}</p>
+                                                {{ $item->product_name }}
+                                            </p>
                                             <p class="text-xs text-gray-400">×{{ $item->quantity }}</p>
                                         </div>
                                         <span
@@ -932,23 +1034,32 @@
 
                             <div class="flex items-center justify-between mb-3">
                                 <span class="text-sm text-gray-400">Subtotal</span>
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">Rp
-                                    {{ number_format($subtotal, 0, ',', '.') }}</span>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">
+                                    Rp {{ number_format($subtotal, 0, ',', '.') }}
+                                </span>
                             </div>
                             <div class="flex items-center justify-between mb-3">
                                 <span class="text-sm text-gray-400">Berat</span>
-                                <span
-                                    class="text-sm font-medium text-gray-900 dark:text-white">{{ number_format($totalWeight / 1000, 2) }}
-                                    kg</span>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">
+                                    {{ number_format($totalWeight / 1000, 2) }} kg
+                                </span>
                             </div>
                             <div class="flex items-center justify-between mb-3">
                                 <span class="text-sm text-gray-400">Ongkir</span>
                                 <span class="text-sm font-medium">
+                                    {{-- Pickup: selalu gratis --}}
                                     <span x-show="deliveryMode === 'pickup'"
                                         class="text-green-600 dark:text-green-400">Gratis</span>
-                                    <span x-show="deliveryMode === 'delivery' && shippingPrice === 0"
+                                    {{-- Delivery: belum pilih --}}
+                                    <span x-show="deliveryMode === 'delivery' && selectedShipping === null"
                                         class="text-gray-400">Belum dipilih</span>
-                                    <span x-show="deliveryMode === 'delivery' && shippingPrice > 0"
+                                    {{-- Delivery: sudah pilih, ongkir 0 --}}
+                                    <span
+                                        x-show="deliveryMode === 'delivery' && selectedShipping !== null && selectedShippingIsFree"
+                                        class="text-green-600 dark:text-green-400">Rp 0</span>
+                                    {{-- Delivery: sudah pilih, ongkir > 0 --}}
+                                    <span
+                                        x-show="deliveryMode === 'delivery' && selectedShipping !== null && !selectedShippingIsFree"
                                         class="text-gray-900 dark:text-white" x-text="formatRp(shippingPrice)"></span>
                                 </span>
                             </div>
@@ -972,17 +1083,20 @@
                             </button>
 
                             <p class="mt-3 text-center text-xs text-gray-400 min-h-[18px]" x-show="!canSubmit">
-                                <span x-show="deliveryMode === 'delivery' && selectedAddress === null">Pilih alamat
-                                    pengiriman dulu</span>
+                                <span x-show="deliveryMode === 'delivery' && selectedAddress === null">
+                                    Pilih alamat pengiriman dulu
+                                </span>
+                                <span x-show="deliveryMode === 'delivery' && selectedAddress !== null && loadingRates">
+                                    Menunggu data ongkir…
+                                </span>
                                 <span
-                                    x-show="deliveryMode === 'delivery' && selectedAddress !== null && loadingRates">Menunggu
-                                    data ongkir…</span>
+                                    x-show="deliveryMode === 'delivery' && selectedAddress !== null && !loadingRates && selectedShipping === null && shippingRates.length > 0">
+                                    Pilih metode pengiriman
+                                </span>
                                 <span
-                                    x-show="deliveryMode === 'delivery' && selectedAddress !== null && !loadingRates && selectedShipping === null && shippingRates.length > 0">Pilih
-                                    metode pengiriman</span>
-                                <span
-                                    x-show="(deliveryMode === 'delivery' && selectedShipping !== null || deliveryMode === 'pickup') && selectedPayment === null">Pilih
-                                    metode pembayaran</span>
+                                    x-show="(deliveryMode === 'delivery' && selectedShipping !== null || deliveryMode === 'pickup') && selectedPayment === null">
+                                    Pilih metode pembayaran
+                                </span>
                             </p>
 
                         </div>
@@ -993,9 +1107,5 @@
         </form>
 
     </div>
-
-    {{-- Route yang perlu ditambahkan di web.php:
-    GET  /checkout/shipping-rates   → [CheckoutController::class, 'shippingRates']
---}}
 
 </x-layout>

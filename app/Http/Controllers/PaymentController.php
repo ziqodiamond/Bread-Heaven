@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 class PaymentController extends Controller
 {
     /**
-     * Handle Midtrans notification (webhook)
+     * Handle Midtrans notification (webhook) — tanpa auth middleware
      */
     public function notification(Request $request)
     {
@@ -23,12 +23,12 @@ class PaymentController extends Controller
                     'success' => true,
                     'message' => 'Notification processed',
                 ]);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'error' => $result['error'],
-                ], 400);
             }
+
+            return response()->json([
+                'success' => false,
+                'error' => $result['error'],
+            ], 400);
         } catch (\Exception $e) {
             \Log::error('PaymentController::notification error', [
                 'error' => $e->getMessage(),
@@ -42,11 +42,14 @@ class PaymentController extends Controller
     }
 
     /**
-     * Finish callback dari Midtrans (user redirect after payment success) 
+     * Finish callback dari Midtrans — redirect ke halaman sukses
      */
     public function finish(Order $order)
     {
-        // Check payment status di Midtrans
+        // Pastikan order milik user login
+        abort_if($order->user_id !== auth()->id(), 403);
+
+        // Cek status terkini dari Midtrans
         if ($order->paymentTransactions()->exists()) {
             $transaction = $order->paymentTransactions()->latest()->first();
 
@@ -58,26 +61,55 @@ class PaymentController extends Controller
             if ($statusResult['success']) {
                 $status = $statusResult['status'];
 
+                // Jika sukses → halaman sukses
                 if (in_array($status, ['settlement', 'capture', 'paid'])) {
+                    return redirect()->route('payment.success', $order->id);
+                }
+
+                // Jika pending → halaman order dengan info
+                if ($status === 'pending') {
                     return redirect()->route('orders.show', $order->id)
-                        ->with('success', 'Pembayaran berhasil! Pesanan akan diproses.');
-                } elseif ($status === 'pending') {
-                    return redirect()->route('orders.show', $order->id)
-                        ->with('info', 'Pembayaran dalam proses. Mohon tunggu.');
+                        ->with('info', 'Pembayaran dalam proses. Mohon tunggu konfirmasi.');
                 }
             }
         }
 
-        return redirect()->route('orders.show', $order->id);
+        // Fallback — cek dari DB saja
+        if ($order->payment_status === 'paid') {
+            return redirect()->route('payment.success', $order->id);
+        }
+
+        return redirect()->route('orders.show', $order->id)
+            ->with('info', 'Pembayaran sedang diverifikasi.');
     }
 
     /**
-     * Unfinish callback dari Midtrans (payment incomplete)
+     * Halaman sukses pembayaran
+     */
+    public function success(Order $order)
+    {
+        abort_if($order->user_id !== auth()->id(), 403);
+
+        $order->load([
+            'items',
+            'paymentMethod',
+            'paymentTransactions' => fn($q) => $q->latest(),
+        ]);
+
+        $transaction = $order->paymentTransactions->first();
+
+        return view('payment.success', compact('order', 'transaction'));
+    }
+
+    /**
+     * Unfinish callback — user tutup popup sebelum selesai
      */
     public function unfinish(Order $order)
     {
+        abort_if($order->user_id !== auth()->id(), 403);
+
         return redirect()->route('orders.show', $order->id)
-            ->with('warning', 'Pembayaran belum selesai. Silakan coba lagi atau gunakan metode pembayaran lain.');
+            ->with('warning', 'Pembayaran belum selesai. Silakan lanjutkan pembayaran.');
     }
 
     /**
@@ -85,25 +117,19 @@ class PaymentController extends Controller
      */
     public function error(Order $order)
     {
+        abort_if($order->user_id !== auth()->id(), 403);
+
         return redirect()->route('orders.show', $order->id)
             ->with('error', 'Terjadi kesalahan pada pembayaran. Silakan coba lagi.');
     }
 
     /**
-     * Show payment page/form untuk order
-     * Optional - jika ingin custom payment page
+     * Show payment page untuk order
      */
     public function show(Order $order)
     {
-        // // Ensure user is order owner
-        // $this->authorize('view', $order);
+        abort_if($order->user_id !== auth()->id(), 403);
 
-        abort_if(
-            $order->user_id !== auth()->id(),
-            403
-        );
-
-        // Get latest payment transaction
         $transaction = $order->paymentTransactions()->latest()->first();
 
         if (!$transaction) {
@@ -114,20 +140,17 @@ class PaymentController extends Controller
     }
 
     /**
-     * Retry payment untuk order yang failed
+     * Retry payment untuk order yang failed/expired
      */
     public function retry(Order $order)
     {
-        // Ensure user is order owner
-        $this->authorize('update', $order);
+        abort_if($order->user_id !== auth()->id(), 403);
 
-        // Check if payment already settled
         if ($order->payment_status === 'paid') {
             return redirect()->route('orders.show', $order->id)
                 ->with('info', 'Pesanan sudah dibayar.');
         }
 
-        // Create new Midtrans transaction
         $midtransService = app(MidtransService::class);
         $paymentResult = $midtransService->createTransaction($order);
 
@@ -136,44 +159,6 @@ class PaymentController extends Controller
                 ->with('error', 'Gagal membuat transaksi: ' . $paymentResult['error']);
         }
 
-        // Redirect ke Midtrans Snap
         return redirect($paymentResult['redirect_url']);
-    }
-
-    public function markAsExpired(
-        array $payload = []
-    ): void {
-
-        $this->update([
-
-            'transaction_status' => 'expire',
-
-            'payload' => $payload,
-        ]);
-
-        /*
-    |--------------------------------------------------------------------------
-    | Update order
-    |--------------------------------------------------------------------------
-    */
-
-        $this->order?->update([
-
-            'payment_status' => 'expired',
-        ]);
-
-        /*
-    |--------------------------------------------------------------------------
-    | Balikin stok
-    |--------------------------------------------------------------------------
-    */
-
-        foreach ($this->order?->items ?? [] as $item) {
-
-            $item->product?->increment(
-                'stock',
-                $item->quantity
-            );
-        }
     }
 }

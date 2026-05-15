@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('shipments', function (Blueprint $table) {
+        Schema::create('product_reviews', function (Blueprint $table) {
 
             /*
             |--------------------------------------------------------------------------
@@ -27,104 +27,68 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
+            $table->foreignUuid('user_id')
+                ->constrained()
+                ->cascadeOnDelete();
+
             $table->foreignUuid('order_id')
-                ->constrained('orders')
+                ->constrained()
+                ->cascadeOnDelete();
+
+            $table->foreignUuid('order_item_id')
+                ->constrained()
+                ->cascadeOnDelete();
+
+            $table->foreignUuid('product_id')
+                ->constrained()
                 ->cascadeOnDelete();
 
             /*
             |--------------------------------------------------------------------------
-            | Provider Shipping
+            | Rating & Review
             |--------------------------------------------------------------------------
             */
 
-            // biteship, manual, jne, dll
-            $table->string('provider')->nullable();
+            $table->unsignedTinyInteger('rating');
+
+            $table->text('review')
+                ->nullable();
 
             /*
             |--------------------------------------------------------------------------
-            | Informasi Courier
+            | Status
             |--------------------------------------------------------------------------
             */
 
-            // JNE, J&T, SiCepat
-            $table->string('courier_name')->nullable();
+            $table->boolean('is_anonymous')
+                ->default(false);
 
-            // REG, YES, EZ, dll
-            $table->string('courier_service')->nullable();
+            $table->boolean('is_visible')
+                ->default(true);
 
             /*
             |--------------------------------------------------------------------------
-            | Informasi Resi
+            | Balasan Admin
             |--------------------------------------------------------------------------
             */
 
-            // Nomor resi
-            $table->string('tracking_number')->nullable();
+            $table->text('admin_reply')
+                ->nullable();
 
-            // Reference ID dari Biteship/API
-            $table->string('shipment_reference')->nullable();
+            $table->timestamp('admin_replied_at')
+                ->nullable();
 
             /*
             |--------------------------------------------------------------------------
-            | Tracking URL
+            | Moderation
             |--------------------------------------------------------------------------
             */
 
-            // Direct link tracking courier
-            $table->text('tracking_url')->nullable();
+            $table->timestamp('hidden_at')
+                ->nullable();
 
-            /*
-            |--------------------------------------------------------------------------
-            | Status Pengiriman
-            |--------------------------------------------------------------------------
-            */
-
-            $table->enum('status', [
-
-                'pending',
-                'shipped',
-                'delivered',
-                'cancelled',
-
-            ])->default('pending');
-
-            /*
-            |--------------------------------------------------------------------------
-            | Tracking Snapshot
-            |--------------------------------------------------------------------------
-            */
-
-            // Status tracking terakhir
-            $table->string('last_tracking_status')->nullable();
-
-            // Waktu terakhir cek tracking
-            $table->timestamp('last_tracking_checked_at')->nullable();
-
-            /*
-            |--------------------------------------------------------------------------
-            | Catatan
-            |--------------------------------------------------------------------------
-            */
-
-            $table->text('notes')->nullable();
-
-            /*
-            |--------------------------------------------------------------------------
-            | Payload API Shipping
-            |--------------------------------------------------------------------------
-            */
-
-            $table->json('payload')->nullable();
-
-            /*
-            |--------------------------------------------------------------------------
-            | Timestamp Pengiriman
-            |--------------------------------------------------------------------------
-            */
-
-            $table->timestamp('shipped_at')->nullable();
-
-            $table->timestamp('delivered_at')->nullable();
+            $table->text('hidden_reason')
+                ->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -133,6 +97,31 @@ return new class extends Migration
             */
 
             $table->timestamps();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Index
+            |--------------------------------------------------------------------------
+            */
+
+            $table->index('rating');
+
+            $table->index('product_id');
+
+            $table->index('user_id');
+
+            $table->index('is_visible');
+
+            /*
+            |--------------------------------------------------------------------------
+            | Prevent Duplicate Review
+            |--------------------------------------------------------------------------
+            */
+
+            $table->unique([
+                'user_id',
+                'order_item_id',
+            ]);
         });
     }
 
@@ -141,6 +130,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('shipments');
+        Schema::dropIfExists('product_reviews');
     }
 };

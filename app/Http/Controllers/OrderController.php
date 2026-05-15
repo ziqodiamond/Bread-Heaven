@@ -125,7 +125,7 @@ class OrderController extends Controller
                 return back()->with(
                     'error',
                     'Gagal membatalkan transaksi di Midtrans: '
-                        . ($response['message'] ?? 'Unknown error')
+                        . ($response['error'] ?? 'Unknown error')
                 );
             }
         }

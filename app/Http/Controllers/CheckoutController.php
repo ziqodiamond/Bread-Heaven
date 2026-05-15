@@ -8,6 +8,7 @@ use App\Models\OrderItem;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ShippingMethod;
+use App\Models\ShippingRate;
 use App\Models\Store;
 use App\Models\UserAddress;
 use Illuminate\Http\Request;
@@ -47,16 +48,16 @@ class CheckoutController extends Controller
 
             $items = collect([
                 (object) [
-                    'product'          => $product,
-                    'quantity'         => $quantity,
-                    'price'            => $product->price,
-                    'subtotal'         => $product->price * $quantity,
-                    'total_weight'     => $product->weight * $quantity,
+                    'product'           => $product,
+                    'quantity'          => $quantity,
+                    'price'             => $product->price,
+                    'subtotal'          => $product->price * $quantity,
+                    'total_weight'      => $product->weight * $quantity,
 
                     // alias untuk view
-                    'product_name'     => $product->name,
+                    'product_name'      => $product->name,
                     'product_image_url' => $product->thumbnail,
-                    'product_price'    => $product->price,
+                    'product_price'     => $product->price,
                 ],
             ]);
 
@@ -94,12 +95,12 @@ class CheckoutController extends Controller
             ->get();
 
         /* ------------------------------------------------------------------ */
-        /* Toko (pickup info + shipping origin untuk Biteship)                  */
+        /* Toko — shipping origin untuk Biteship                               */
         /* ------------------------------------------------------------------ */
-
-        // Ambil toko yang allow pickup dan/atau shipping origin
         $store = Store::active()
-            ->first(); // ambil toko pertama; kalau multi-store sesuaikan
+            ->shippingOrigin()
+            ->first()
+            ?? Store::active()->first();
 
         /* ------------------------------------------------------------------ */
         /* Payment methods (available)                                          */
@@ -109,20 +110,17 @@ class CheckoutController extends Controller
             ->orderBy('name')
             ->get();
 
-        /* ------------------------------------------------------------------ */
-        /* Shipping methods (available) — dipakai sebagai fallback statis       */
-        /* Nanti diganti response Biteship real-time via AJAX/HTMX              */
-        /* ------------------------------------------------------------------ */
-        $shippingMethods = ShippingMethod::available()
-            ->orderBy('courier_name')
-            ->orderBy('service_name')
-            ->get();
+        /*
+        |--------------------------------------------------------------------------
+        | $shippingMethods TIDAK lagi di-pass ke view untuk di-render statis.
+        | Data ongkir diambil real-time via endpoint shippingRates() (fetch/HTMX).
+        |--------------------------------------------------------------------------
+        */
 
         return view('checkout.index', compact(
             'cart',
             'addresses',
             'paymentMethods',
-            'shippingMethods',
             'store',
             'subtotal',
             'totalWeight',
@@ -152,37 +150,84 @@ class CheckoutController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | store — Proses checkout, buat Order
+    | store — Proses checkout
     |--------------------------------------------------------------------------
-    | Flow saat ini   : buat Order + OrderItem → redirect ke payment
     |
-    | TODO Midtrans   : setelah Order dibuat, panggil Midtrans Snap API,
-    |                   simpan snap_token ke Order, redirect ke Snap payment page
+    | FLOW YANG BENAR:
+    |   1. Validasi input (shipping_method_id bukan shipping_rate_id)
+    |   2. Verifikasi ShippingMethod ada & available
+    |   3. Hitung ulang harga dari Biteship (pakai cache — tidak perlu hit API lagi)
+    |   4. Buat Order
+    |   5. Buat OrderItem
+    |   6. ShippingRate::create() dengan order_id yang sudah ada  ← HANYA DI SINI
+    |   7. Kosongkan cart
+    |   8. Buat transaksi Midtrans
     |
-    | TODO Biteship   : ongkir sudah dipilih di front-end (AJAX),
-    |                   simpan shipping_method_id + rate_id ke Order
+    | PENTING: ShippingRate TIDAK dibuat di shippingRates() endpoint.
+    |          ShippingRate adalah snapshot permanen setelah order confirmed.
     |--------------------------------------------------------------------------
     */
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'delivery_mode'      => ['required', 'in:delivery,pickup'],
-            'payment_method_id'  => ['required', 'exists:payment_methods,id'],
+            'delivery_mode'     => ['required', 'in:delivery,pickup'],
+            'payment_method_id' => ['required', 'exists:payment_methods,id'],
 
-            // hanya wajib kalau delivery
-            'user_address_id'    => [
+            // Wajib saat delivery
+            'user_address_id' => [
                 'required_if:delivery_mode,delivery',
                 'nullable',
                 'exists:user_addresses,id',
             ],
-            'shipping_rate_id' => [
+
+            /*
+            |----------------------------------------------------------------------
+            | FIX: Ganti 'sometimes' + closure saja → tambah 'required_if' eksplisit.
+            |
+            | Masalah sebelumnya:
+            |   - Alpine kirim shipping_method_id="" (string kosong) saat null
+            |   - Laravel dengan 'sometimes' + 'nullable' bisa mengabaikan key tsb
+            |     sehingga $validated['shipping_method_id'] tidak ada → ErrorException
+            |
+            | Solusi:
+            |   - 'required_if:delivery_mode,delivery' → wajib ada & tidak kosong saat delivery
+            |   - 'nullable' tetap ada → aman untuk mode pickup (nilai null/kosong diizinkan)
+            |   - Closure tetap untuk validasi eksistensi ShippingMethod
+            |----------------------------------------------------------------------
+            */
+            'shipping_method_id' => [
                 'required_if:delivery_mode,delivery',
                 'nullable',
-                'exists:shipping_rates,id',
+                'string',
+                function ($attribute, $value, $fail) use ($request) {
+                    // Hanya validasi lebih lanjut jika ada nilainya
+                    if (! empty($value)) {
+                        $exists = ShippingMethod::where('id', $value)
+                            ->where('status', 'available')
+                            ->exists();
+
+                        if (! $exists) {
+                            $fail('Metode pengiriman tidak valid atau tidak tersedia.');
+                        }
+                    }
+                },
             ],
 
-            'notes' => ['nullable', 'string', 'max:1000'],
+            /*
+            |----------------------------------------------------------------------
+            | courier_code & service_code dikirim dari front-end
+            | untuk verifikasi ulang harga ke Biteship (dari cache)
+            |----------------------------------------------------------------------
+            */
+            'courier_code'  => ['nullable', 'string'],
+            'service_code'  => ['nullable', 'string'],
+
+            // Harga yang dipilih user — untuk cross-check
+            'selected_price' => ['nullable', 'integer', 'min:0'],
+
+            'notes'         => ['nullable', 'string', 'max:1000'],
+            'checkout_mode' => ['nullable', 'string', 'in:cart,buy_now'],
         ]);
 
         $user = auth()->user();
@@ -191,239 +236,338 @@ class CheckoutController extends Controller
         /* Resolve cart items                                                   */
         /* ------------------------------------------------------------------ */
         if ($request->checkout_mode === 'buy_now') {
+            // TODO: implementasi buy_now store
             abort(501, 'Buy now store belum diimplementasikan.');
-        } else {
-            $cart = $user->cart()
-                ->with(['items.product'])
-                ->firstOrFail();
-
-            abort_if($cart->items->isEmpty(), 400, 'Keranjang kosong.');
         }
 
-        /* ------------------------------------------------------------------ */
-        /* Hitung total                                                         */
-        /* ------------------------------------------------------------------ */
-        $subtotal     = $cart->items->sum('subtotal');
-        $totalWeight  = $cart->items->sum('total_weight');
-        $shippingFee  = 0;
-        $shippingRate = null;
+        $cart = $user->cart()
+            ->with(['items.product'])
+            ->firstOrFail();
 
+        abort_if($cart->items->isEmpty(), 400, 'Keranjang kosong.');
+
+        /* ------------------------------------------------------------------ */
+        /* Hitung subtotal & berat                                              */
+        /* ------------------------------------------------------------------ */
+        $subtotal    = $cart->items->sum('subtotal');
+        $totalWeight = $cart->items->sum('total_weight');
+        $shippingFee = 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Variabel untuk snapshot ShippingRate setelah order dibuat
+        |--------------------------------------------------------------------------
+        */
+        $selectedShippingMethod = null;
+        $resolvedCourierName    = '';
+        $resolvedServiceName    = '';
+        $resolvedEtd            = '';
+        $resolvedCourierCode    = '';
+        $resolvedServiceCode    = '';
+        $shippingRateRaw        = [];
+        $address                = null;
+        $store                  = Store::active()->shippingOrigin()->first()
+            ?? Store::active()->first();
+
+        /* ------------------------------------------------------------------ */
+        /* DELIVERY — Hitung ongkir                                             */
+        /* ------------------------------------------------------------------ */
         if ($validated['delivery_mode'] === 'delivery') {
-            // Fetch shipping rate yang dipilih
-            $shippingRate = \App\Models\ShippingRate::findOrFail(
-                $validated['shipping_rate_id']
-            );
 
-            // Verify alamat belongs to user
+            // Verify alamat milik user
             $address = UserAddress::where('id', $validated['user_address_id'])
                 ->where('user_id', $user->id)
                 ->firstOrFail();
 
-            $shippingFee = $shippingRate->price;
-        } else {
-            // Pickup - no shipping fee
-            $address = null;
+            /*
+            |----------------------------------------------------------------------
+            | FIX: Ambil shipping_method_id dengan null-safe operator.
+            |
+            | Meskipun validasi 'required_if' di atas sudah menjamin key ada
+            | saat delivery_mode=delivery, kita tambahkan guard eksplisit sebagai
+            | defense in depth — mencegah ErrorException jika key entah bagaimana
+            | tidak masuk ke $validated.
+            |----------------------------------------------------------------------
+            */
+            $shippingMethodId = $validated['shipping_method_id'] ?? null;
+
+            abort_if(
+                empty($shippingMethodId),
+                422,
+                'Metode pengiriman wajib dipilih.'
+            );
+
+            $selectedShippingMethod = ShippingMethod::where('id', $shippingMethodId)
+                ->where('status', 'available')
+                ->firstOrFail();
+
+            /*
+            |----------------------------------------------------------------------
+            | Hitung ulang harga dari Biteship (cache masih valid dari shippingRates)
+            | Ini mencegah user manipulasi harga dari front-end
+            |----------------------------------------------------------------------
+            */
+            if ($selectedShippingMethod->provider === 'biteship') {
+
+                abort_if(
+                    ! $store || ! $store->latitude || ! $store->longitude,
+                    422,
+                    'Konfigurasi toko belum lengkap.'
+                );
+
+                abort_if(
+                    ! $address->latitude || ! $address->longitude,
+                    422,
+                    'Alamat belum memiliki koordinat GPS.'
+                );
+
+                $biteshipService = app(\App\Services\BiteshipService::class);
+
+                $ratesResult = $biteshipService->getRates(
+                    originLat: (float) $store->latitude,
+                    originLng: (float) $store->longitude,
+                    destLat: (float) $address->latitude,
+                    destLng: (float) $address->longitude,
+                    weight: $totalWeight,
+                    items: []
+                );
+
+                abort_if(
+                    ! $ratesResult['success'],
+                    422,
+                    'Gagal mengambil data ongkir: ' . ($ratesResult['error'] ?? 'Unknown error')
+                );
+
+                /*
+                |------------------------------------------------------------------
+                | Cari rate yang cocok berdasarkan courier_code + service_code
+                |------------------------------------------------------------------
+                */
+                $matchedRate = collect($ratesResult['pricing'] ?? [])
+                    ->first(function ($rate) use ($validated, $selectedShippingMethod) {
+                        return $rate['courier_code'] === ($validated['courier_code'] ?? $selectedShippingMethod->courier_code)
+                            && $rate['service_code'] === ($validated['service_code'] ?? $selectedShippingMethod->service_code);
+                    });
+
+                abort_if(
+                    ! $matchedRate,
+                    422,
+                    'Layanan pengiriman yang dipilih tidak tersedia lagi. Silakan pilih ulang.'
+                );
+
+                /*
+                |------------------------------------------------------------------
+                | Final price = harga Biteship + additional_fee dari ShippingMethod
+                |------------------------------------------------------------------
+                */
+                $additionalFee = $selectedShippingMethod->additional_fee ?? 0;
+                $shippingFee   = (int) $matchedRate['price'] + $additionalFee;
+
+                // Simpan untuk snapshot ShippingRate
+                $resolvedCourierName = $matchedRate['courier_company'];
+                $resolvedServiceName = $matchedRate['courier_type'];
+                $resolvedEtd         = $matchedRate['etd'] ?? '';
+                $resolvedCourierCode = $matchedRate['courier_code'];
+                $resolvedServiceCode = $matchedRate['service_code'];
+                $shippingRateRaw     = $matchedRate['raw'] ?? $matchedRate;
+            } else {
+
+                /*
+                |------------------------------------------------------------------
+                | Provider static (bukan Biteship) — pakai additional_fee
+                |------------------------------------------------------------------
+                */
+                $shippingFee         = $selectedShippingMethod->additional_fee ?? 0;
+                $resolvedCourierName = $selectedShippingMethod->courier_name;
+                $resolvedServiceName = $selectedShippingMethod->service_name;
+                $resolvedEtd         = $selectedShippingMethod->estimated_delivery ?? '';
+                $resolvedCourierCode = $selectedShippingMethod->courier_code ?? '';
+                $resolvedServiceCode = $selectedShippingMethod->service_code ?? '';
+                $shippingRateRaw     = [];
+            }
         }
 
-        $paymentMethod = \App\Models\PaymentMethod::findOrFail(
-            $validated['payment_method_id']
-        );
+        /* ------------------------------------------------------------------ */
+        /* Payment fee & grand total                                            */
+        /* ------------------------------------------------------------------ */
+        $paymentMethod = PaymentMethod::findOrFail($validated['payment_method_id']);
 
-        $serviceFee = $paymentMethod->calculateFee(
-            $subtotal + $shippingFee
-        );
+        $serviceFee     = $paymentMethod->calculateFee($subtotal + $shippingFee);
         $discountAmount = 0;
-        $grandTotal = $subtotal + $shippingFee + $serviceFee - $discountAmount;
+        $grandTotal     = $subtotal + $shippingFee + $serviceFee - $discountAmount;
 
         /* ------------------------------------------------------------------ */
         /* Buat Order                                                           */
         /* ------------------------------------------------------------------ */
-        $store = Store::active()->shippingOrigin()->first()
-            ?? Store::active()->first();
-
         $order = Order::create([
-            'user_id'            => $user->id,
-            'invoice_number'     => $this->generateInvoiceNumber(),
-            'user_address_id'    => $address?->id,
-            'payment_method_id'  => $validated['payment_method_id'],
+            'user_id'           => $user->id,
+            'invoice_number'    => $this->generateInvoiceNumber(),
+            'user_address_id'   => $address?->id,
+            'payment_method_id' => $validated['payment_method_id'],
 
-            // Informasi Customer
-            'customer_name'      => $user->name,
-            'customer_email'     => $user->email,
-            'customer_phone'     => $user->phone,
+            // Informasi customer
+            'customer_name'  => $user->name,
+            'customer_email' => $user->email,
+            'customer_phone' => $user->phone,
 
-            // Snapshot Alamat Pengiriman
-            'shipping_receiver_name'   => $address?->receiver_name,
-            'shipping_receiver_phone'  => $address?->receiver_phone,
-            'shipping_province'        => $address?->province,
-            'shipping_city'            => $address?->city,
-            'shipping_district'        => $address?->district,
-            'shipping_postal_code'     => $address?->postal_code,
-            'shipping_full_address'    => $address?->full_address,
-            'shipping_notes'           => $address?->notes,
+            // Snapshot alamat pengiriman
+            'shipping_receiver_name'  => $address?->receiver_name  ?? $user->name,
+            'shipping_receiver_phone' => $address?->receiver_phone ?? ($user->phone ?? ''),
+            'shipping_province'       => $address?->province       ?? '',
+            'shipping_city'           => $address?->city           ?? '',
+            'shipping_district'       => $address?->district       ?? '',
+            'shipping_postal_code'    => $address?->postal_code    ?? '',
+            'shipping_full_address'   => $address?->full_address   ?? ($store?->full_address ?? ''),
+            'shipping_notes'          => $address?->notes          ?? '',
 
-            // Shipping Info
-            'shipping_courier'   => $shippingRate?->courier_name,
-            'shipping_service'   => $shippingRate?->service_name,
-            'shipping_etd'       => $shippingRate?->etd,
+            // Shipping info
+            'shipping_courier' => $resolvedCourierName ?: '',
+            'shipping_service' => $resolvedServiceName ?: ($validated['delivery_mode'] === 'pickup' ? 'Ambil di Toko' : ''),
+            'shipping_etd'     => $resolvedEtd,
 
             // Harga
-            'subtotal'           => $subtotal,
-            'shipping_cost'      => $shippingFee,
-            'service_fee'        => $serviceFee,
-            'discount_amount'    => $discountAmount,
-            'grand_total'        => $grandTotal,
+            'subtotal'        => $subtotal,
+            'shipping_cost'   => $shippingFee,
+            'service_fee'     => $serviceFee,
+            'discount_amount' => $discountAmount,
+            'grand_total'     => $grandTotal,
 
             // Berat
-            'total_weight'       => $totalWeight,
+            'total_weight' => $totalWeight,
 
             // Status
-            'order_status'       => 'pending',
-            'payment_status'     => 'unpaid',
-            'payment_gateway'    => 'midtrans',
+            'order_status'    => 'pending',
+            'payment_status'  => 'unpaid',
+            'payment_gateway' => 'midtrans',
 
             // Catatan
-            'notes'              => $validated['notes'],
+            'notes' => $validated['notes'] ?? null,
         ]);
 
         /* ------------------------------------------------------------------ */
-        /* Buat Order Items                                                     */
+        /* Buat Order Items + kurangi stok                                     */
         /* ------------------------------------------------------------------ */
         foreach ($cart->items as $item) {
 
             $product = $item->product;
 
-            \App\Models\OrderItem::create([
-
-                /*
-        |--------------------------------------------------------------------------
-        | Relasi
-        |--------------------------------------------------------------------------
-        */
-
+            OrderItem::create([
                 'order_id'   => $order->id,
                 'product_id' => $product->id,
 
-                /*
-        |--------------------------------------------------------------------------
-        | Snapshot Produk
-        |--------------------------------------------------------------------------
-        */
-
+                // Snapshot produk
                 'product_name'        => $product->name,
                 'product_slug'        => $product->slug,
                 'product_sku'         => $product->sku,
                 'product_description' => $product->description,
                 'product_image_url'   => $product->thumbnail,
 
-                /*
-        |--------------------------------------------------------------------------
-        | Snapshot Harga
-        |--------------------------------------------------------------------------
-        */
-
+                // Snapshot harga
                 'product_price' => $product->price,
 
-                /*
-        |--------------------------------------------------------------------------
-        | Quantity
-        |--------------------------------------------------------------------------
-        */
-
+                // Quantity
                 'quantity' => $item->quantity,
 
-                /*
-        |--------------------------------------------------------------------------
-        | Berat
-        |--------------------------------------------------------------------------
-        */
-
+                // Berat
                 'product_weight' => $product->weight,
                 'total_weight'   => $item->total_weight,
 
-                /*
-        |--------------------------------------------------------------------------
-        | Total Harga
-        |--------------------------------------------------------------------------
-        */
-
+                // Total
                 'subtotal' => $item->subtotal,
 
-                /*
-        |--------------------------------------------------------------------------
-        | Status
-        |--------------------------------------------------------------------------
-        */
-
+                // Status
                 'status' => 'active',
             ]);
 
-            /*
-    |--------------------------------------------------------------------------
-    | Kurangi stok produk
-    |--------------------------------------------------------------------------
-    */
-
+            // Kurangi stok
             $product->decreaseStock($item->quantity);
         }
 
-        /* ------------------------------------------------------------------ */
-        /* Snapshot Shipping Rate ke ShippingRate jika delivery                 */
-        /* ------------------------------------------------------------------ */
-        if ($shippingRate) {
-            $shippingRate->update([
+        /*
+        |--------------------------------------------------------------------------
+        | Buat ShippingRate — HANYA setelah Order berhasil dibuat
+        |--------------------------------------------------------------------------
+        | Ini adalah snapshot permanen dari ongkir yang dipilih user.
+        | Tidak dibuat di shippingRates() endpoint (yang hanya untuk preview).
+        |--------------------------------------------------------------------------
+        */
+        if ($selectedShippingMethod && $validated['delivery_mode'] === 'delivery') {
+
+            ShippingRate::create([
                 'order_id' => $order->id,
+
+                'provider'     => $selectedShippingMethod->provider,
+                'courier_name' => $resolvedCourierName,
+                'courier_code' => $resolvedCourierCode,
+                'service_name' => $resolvedServiceName,
+                'service_code' => $resolvedServiceCode,
+
+                'weight' => $totalWeight,
+                'etd'    => $resolvedEtd,
+                'price'  => $shippingFee,
+
+                // Snapshot koordinat & alamat
                 'origin' => [
-                    'latitude' => $store->latitude,
-                    'longitude' => $store->longitude,
-                    'address' => $store->full_address,
+                    'latitude'  => $store?->latitude,
+                    'longitude' => $store?->longitude,
+                    'address'   => $store?->full_address ?? '',
                 ],
                 'destination' => [
-                    'latitude' => $address->latitude,
+                    'latitude'  => $address->latitude,
                     'longitude' => $address->longitude,
-                    'address' => $address->full_address_text,
+                    'address'   => $address->full_address_text ?? '',
                 ],
+
+                // Raw response dari Biteship (untuk audit/debug)
+                'response' => $shippingRateRaw,
             ]);
         }
 
         /* ------------------------------------------------------------------ */
-        /* Kosongkan keranjang setelah checkout                                 */
+        /* Kosongkan keranjang                                                  */
         /* ------------------------------------------------------------------ */
         $cart->items()->delete();
 
         /* ------------------------------------------------------------------ */
-        /* Create Midtrans Transaction (Payment)                               */
+        /* Buat transaksi Midtrans                                              */
         /* ------------------------------------------------------------------ */
         $midtransService = app(\App\Services\MidtransService::class);
-        $paymentResult = $midtransService->createTransaction($order);
+        $paymentResult   = $midtransService->createTransaction($order);
 
-        if (!$paymentResult['success']) {
+        if (! $paymentResult['success']) {
             // Jika Midtrans gagal, cancel order
             $order->cancel();
+
             return redirect()
                 ->back()
                 ->with('error', 'Gagal membuat transaksi pembayaran: ' . $paymentResult['error']);
         }
 
-        // Save payment reference
+        // Simpan payment reference
         $order->update([
             'payment_reference' => $paymentResult['transaction']->id,
         ]);
 
-        /* ------------------------------------------------------------------ */
-        /* Redirect ke Midtrans Snap Payment Page                              */
-        /* ------------------------------------------------------------------ */
         return redirect($paymentResult['redirect_url'])
             ->with('success', 'Pesanan dibuat! Silakan lakukan pembayaran.');
     }
 
     /*
     |--------------------------------------------------------------------------
-    | shippingRates — AJAX endpoint untuk fetch ongkir Biteship
+    | shippingRates — Endpoint untuk preview ongkir (fetch / HTMX)
     |--------------------------------------------------------------------------
-    | Dipanggil via fetch/HTMX saat user memilih alamat di checkout.
     |
-    | TODO: Implementasikan integrasi Biteship di sini.
+    | PENTING — Endpoint ini HANYA mengembalikan list ongkir untuk ditampilkan.
+    |           TIDAK membuat ShippingRate di database.
+    |
+    | Flow:
+    |   1. Ambil semua ShippingMethod available (semua provider)
+    |   2. Untuk provider 'biteship': hit Biteship API (dengan cache)
+    |      → filter hanya yang courier_code-nya ada di ShippingMethod available
+    |   3. Untuk provider lain (static): pakai additional_fee dari ShippingMethod
+    |   4. Return JSON gabungan — front-end tampilkan, user pilih
+    |
+    | Tidak ada write ke DB di sini.
     |--------------------------------------------------------------------------
     */
 
@@ -431,145 +575,91 @@ class CheckoutController extends Controller
     {
         $validated = $request->validate([
             'address_id' => ['required', 'exists:user_addresses,id'],
-            'weight'     => ['required', 'integer', 'min:100'],
+            'weight'     => ['required', 'integer', 'min:1'],
         ]);
 
         try {
 
             $user = auth()->user();
 
-            /*
-        |--------------------------------------------------------------------------
-        | Verify address milik user
-        |--------------------------------------------------------------------------
-        */
-
-            $address = UserAddress::where(
-                'id',
-                $validated['address_id']
-            )
+            /* -------------------------------------------------------------- */
+            /* Verify address milik user                                        */
+            /* -------------------------------------------------------------- */
+            $address = UserAddress::where('id', $validated['address_id'])
                 ->where('user_id', $user->id)
                 ->firstOrFail();
 
-            /*
-        |--------------------------------------------------------------------------
-        | Ambil toko origin
-        |--------------------------------------------------------------------------
-        */
-
+            /* -------------------------------------------------------------- */
+            /* Ambil toko origin                                                */
+            /* -------------------------------------------------------------- */
             $store = Store::active()
                 ->shippingOrigin()
                 ->first()
-
                 ?? Store::active()->first();
 
             abort_if(
-                !$store ||
-                    !$store->latitude ||
-                    !$store->longitude,
+                ! $store || ! $store->latitude || ! $store->longitude,
                 404,
-                'Store tidak memiliki koordinat GPS'
+                'Store tidak memiliki koordinat GPS.'
             );
 
             abort_if(
-                !$address->latitude ||
-                    !$address->longitude,
+                ! $address->latitude || ! $address->longitude,
                 400,
-                'Alamat belum memiliki koordinat GPS'
+                'Alamat belum memiliki koordinat GPS.'
             );
 
-            /*
-        |--------------------------------------------------------------------------
-        | STATIC PROVIDERS
-        |--------------------------------------------------------------------------
-        | Semua provider selain biteship
-        |--------------------------------------------------------------------------
-        */
-
-            $staticRates = ShippingMethod::query()
-
-                ->where('provider', '!=', 'biteship')
-
-                ->where('status', 'available')
-
-                ->get()
-
-                ->map(function ($method) {
-
-                    return [
-
-                        'id' => $method->id,
-
-                        'provider' => $method->provider,
-
-                        'name' =>
-                        $method->courier_name .
-                            ' - ' .
-                            $method->service_name,
-
-                        'courier_company' =>
-                        $method->courier_name,
-
-                        'courier_type' =>
-                        $method->service_name,
-
-                        'service_type' => 'static',
-
-                        'description' =>
-                        $method->description,
-
-                        'price' =>
-                        $method->additional_fee,
-
-                        'price_formatted' =>
-                        'Rp ' .
-                            number_format(
-                                $method->additional_fee,
-                                0,
-                                ',',
-                                '.'
-                            ),
-
-                        'etd' =>
-                        $method->estimated_delivery,
-
-                        'features' => [],
-                    ];
-                });
+            /* -------------------------------------------------------------- */
+            /* Ambil semua ShippingMethod available                             */
+            /* -------------------------------------------------------------- */
+            $allMethods = ShippingMethod::where('status', 'available')
+                ->orderBy('courier_name')
+                ->orderBy('service_name')
+                ->get();
 
             /*
-        |--------------------------------------------------------------------------
-        | CEK BITESHIP AKTIF
-        |--------------------------------------------------------------------------
-        */
+            |------------------------------------------------------------------
+            | Pisahkan: static (non-biteship) vs dynamic (biteship)
+            |------------------------------------------------------------------
+            */
+            $staticMethods   = $allMethods->where('provider', '!=', 'biteship');
+            $biteshipMethods = $allMethods->where('provider', 'biteship');
 
-            $biteshipExists = ShippingMethod::query()
+            /* -------------------------------------------------------------- */
+            /* STATIC RATES — Langsung dari ShippingMethod                     */
+            /* -------------------------------------------------------------- */
+            $staticRates = $staticMethods->map(function ($method) {
+                return [
+                    /*
+                    |--------------------------------------------------------------
+                    | id = ShippingMethod->id
+                    | Ini yang dikirim ke form sebagai shipping_method_id
+                    |--------------------------------------------------------------
+                    */
+                    'id'              => $method->id,
+                    'provider'        => $method->provider,
+                    'name'            => $method->courier_name . ' - ' . $method->service_name,
+                    'courier_company' => $method->courier_name,
+                    'courier_type'    => $method->service_name,
+                    'courier_code'    => $method->courier_code ?? '',
+                    'service_code'    => $method->service_code ?? '',
+                    'service_type'    => 'static',
+                    'description'     => $method->description,
+                    'price'           => $method->additional_fee ?? 0,
+                    'price_formatted' => 'Rp ' . number_format($method->additional_fee ?? 0, 0, ',', '.'),
+                    'etd'             => $method->estimated_delivery,
+                    'features'        => [],
+                ];
+            })->values();
 
-                ->where('provider', 'biteship')
+            /* -------------------------------------------------------------- */
+            /* DYNAMIC RATES — Dari Biteship API (cache)                       */
+            /* -------------------------------------------------------------- */
+            $dynamicRates = collect();
 
-                ->where('status', 'available')
+            if ($biteshipMethods->isNotEmpty()) {
 
-                ->exists();
-
-            /*
-        |--------------------------------------------------------------------------
-        | Dynamic rates default kosong
-        |--------------------------------------------------------------------------
-        */
-
-            $dynamicRates = [];
-
-            /*
-        |--------------------------------------------------------------------------
-        | FETCH BITESHIP
-        |--------------------------------------------------------------------------
-        */
-
-            if ($biteshipExists) {
-
-                $biteshipService = app(
-                    \App\Services\BiteshipService::class
-                );
+                $biteshipService = app(\App\Services\BiteshipService::class);
 
                 $ratesResult = $biteshipService->getRates(
                     originLat: (float) $store->latitude,
@@ -580,174 +670,94 @@ class CheckoutController extends Controller
                     items: []
                 );
 
-                /*
-            |--------------------------------------------------------------------------
-            | Jika request berhasil
-            |--------------------------------------------------------------------------
-            */
-
                 if ($ratesResult['success']) {
 
-                    $dynamicRates = array_map(
-                        function ($rate) use (
-                            $address,
-                            $store,
-                            $validated
-                        ) {
+                    /*
+                    |----------------------------------------------------------
+                    | Biteship mengembalikan SEMUA kurir yang bisa dipakai.
+                    | Kita filter: hanya tampilkan yang ada di ShippingMethod
+                    | dengan status 'available'.
+                    |----------------------------------------------------------
+                    */
+                    $dynamicRates = collect($ratesResult['pricing'] ?? [])
+                        ->map(function ($rate) use ($biteshipMethods) {
 
                             /*
-                        |--------------------------------------------------------------------------
-                        | Save shipping rate
-                        |--------------------------------------------------------------------------
-                        */
+                            |--------------------------------------------------
+                            | Cari ShippingMethod yang cocok
+                            | Cocok = courier_code + service_code sama
+                            |--------------------------------------------------
+                            */
+                            $shippingMethod = $biteshipMethods->first(function ($m) use ($rate) {
+                                return $m->courier_code === $rate['courier_code']
+                                    && $m->service_code === $rate['service_code'];
+                            });
 
-                            $shippingRate =
-                                \App\Models\ShippingRate::create([
+                            // Jika tidak ada di ShippingMethod → skip (eliminasi)
+                            if (! $shippingMethod) {
+                                return null;
+                            }
 
-                                    'provider' => 'biteship',
-
-                                    'courier_name' =>
-                                    $rate['courier_company'],
-
-                                    'courier_code' =>
-                                    $rate['courier_company'],
-
-                                    'service_name' =>
-                                    $rate['courier_type'],
-
-                                    'service_code' =>
-                                    $rate['courier_type'],
-
-                                    'origin' => [
-                                        'latitude' =>
-                                        $store->latitude,
-
-                                        'longitude' =>
-                                        $store->longitude,
-                                    ],
-
-                                    'destination' => [
-                                        'latitude' =>
-                                        $address->latitude,
-
-                                        'longitude' =>
-                                        $address->longitude,
-                                    ],
-
-                                    'weight' =>
-                                    $validated['weight'],
-
-                                    'etd' =>
-                                    $rate['etd'],
-
-                                    'price' =>
-                                    $rate['price'],
-
-                                    'response' => $rate,
-                                ]);
-
-                            /*
-                        |--------------------------------------------------------------------------
-                        | Format response
-                        |--------------------------------------------------------------------------
-                        */
+                            $additionalFee = $shippingMethod->additional_fee ?? 0;
+                            $finalPrice    = (int) $rate['price'] + $additionalFee;
 
                             return [
-
-                                'id' => $shippingRate->id,
-
-                                'provider' => 'biteship',
-
-                                'name' =>
-                                $rate['courier_company'] .
-                                    ' - ' .
-                                    $rate['courier_type'],
-
-                                'courier_company' =>
-                                $rate['courier_company'],
-
-                                'courier_type' =>
-                                $rate['courier_type'],
-
-                                'service_type' =>
-                                $rate['service_type'],
-
-                                'description' =>
-                                $rate['description'] ?? '',
-
-                                'price' =>
-                                $rate['price'],
-
-                                'price_formatted' =>
-                                'Rp ' .
-                                    number_format(
-                                        $rate['price'],
-                                        0,
-                                        ',',
-                                        '.'
-                                    ),
-
-                                'etd' =>
-                                $rate['etd'],
-
-                                'features' =>
-                                $rate['features'] ?? [],
+                                /*
+                                |----------------------------------------------
+                                | id = ShippingMethod->id (bukan rate id Biteship)
+                                | Konsisten: front-end selalu kirim shipping_method_id
+                                |----------------------------------------------
+                                */
+                                'id'              => $shippingMethod->id,
+                                'provider'        => 'biteship',
+                                'name'            => $rate['courier_company'] . ' - ' . $rate['courier_type'],
+                                'courier_company' => $rate['courier_company'],
+                                'courier_type'    => $rate['courier_type'],
+                                'courier_code'    => $rate['courier_code'],
+                                'service_code'    => $rate['service_code'],
+                                'service_type'    => $rate['service_type'] ?? '',
+                                'description'     => $rate['description'] ?? '',
+                                'price'           => $finalPrice,
+                                'price_formatted' => 'Rp ' . number_format($finalPrice, 0, ',', '.'),
+                                'etd'             => $rate['etd'],
+                                'features'        => $rate['features'] ?? [],
                             ];
-                        },
-                        $ratesResult['pricing'] ?? []
-                    );
+                        })
+                        ->filter() // buang null
+                        ->values();
                 }
             }
 
-            /*
-        |--------------------------------------------------------------------------
-        | Merge static + dynamic rates
-        |--------------------------------------------------------------------------
-        */
-
-            $rates = [
-
-                ...$staticRates->toArray(),
-
-                ...$dynamicRates,
-            ];
-
-            /*
-        |--------------------------------------------------------------------------
-        | Response
-        |--------------------------------------------------------------------------
-        */
+            /* -------------------------------------------------------------- */
+            /* Merge static + dynamic, sort by price                           */
+            /* -------------------------------------------------------------- */
+            $rates = $staticRates
+                ->merge($dynamicRates)
+                ->sortBy('price')
+                ->values();
 
             return response()->json([
-
                 'success' => true,
-
-                'rates' => $rates,
+                'rates'   => $rates,
             ]);
         } catch (\Exception $e) {
 
-            \Log::error(
-                'CheckoutController::shippingRates error',
-                [
-                    'message' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]
-            );
+            \Log::error('CheckoutController::shippingRates error', [
+                'message' => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+            ]);
 
             return response()->json([
-
                 'success' => false,
-
-                'error' => $e->getMessage(),
-
-                'rates' => [],
+                'error'   => $e->getMessage(),
+                'rates'   => [],
             ], 400);
         }
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Helper — Generate order number
+    | Helper — Generate invoice number
     |--------------------------------------------------------------------------
     */
 

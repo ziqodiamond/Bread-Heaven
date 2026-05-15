@@ -76,6 +76,17 @@ return new class extends Migration
             $table->unsignedInteger('width')->nullable();
             $table->unsignedInteger('height')->nullable();
 
+            /*
+            |--------------------------------------------------------------------------
+            | discount
+            |--------------------------------------------------------------------------
+            */
+            $table->bigInteger('sale_price')->nullable();
+
+            $table->timestamp('discount_start_at')->nullable();
+            $table->timestamp('discount_end_at')->nullable();
+
+            $table->string('discount_label')->nullable();
 
             /*
             |--------------------------------------------------------------------------

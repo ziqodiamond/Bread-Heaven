@@ -309,12 +309,9 @@ class Order extends Model
     public function markAsPaid(): void
     {
         $this->update([
-
             'payment_status' => 'paid',
-
-            'order_status' => 'paid',
-
-            'paid_at' => now(),
+            'order_status'   => 'processing', // ✅ lebih proper
+            'paid_at'        => now(),
         ]);
     }
 

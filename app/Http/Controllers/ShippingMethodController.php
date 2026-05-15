@@ -9,115 +9,65 @@ class ShippingMethodController extends Controller
 {
     public function index(Request $request)
     {
-        $statuses = ['available', 'not available'];
+        $statuses = [
+            'available',
+            'unavailable',  // fix: was 'not available' (typo + spasi)
+        ];
 
         $shippingMethods = ShippingMethod::query()
-            ->when($request->status, function ($query, $status) {
-                return $query->where('status', $status);
-            })
+            ->when($request->status, fn($q, $v) => $q->where('status', $v))
             ->get();
 
-        return view('admin.management.shipping-methods.index', compact('shippingMethods', 'statuses'));
+        return view(
+            'admin.management.shipping-methods.index',
+            compact('shippingMethods', 'statuses')
+        );
     }
 
     public function store(Request $request)
     {
-        $validatedData = $request->validate([
-
-            /*
-        |--------------------------------------------------------------------------
-        | Provider Shipping
-        |--------------------------------------------------------------------------
-        */
-
-            'provider' => 'required|string|max:255',
-
-            /*
-        |--------------------------------------------------------------------------
-        | Informasi Courier
-        |--------------------------------------------------------------------------
-        */
-
-            'courier_name' => 'required|string|max:255',
-
-            'courier_code' => 'required|string|max:255',
-
-            /*
-        |--------------------------------------------------------------------------
-        | Informasi Service
-        |--------------------------------------------------------------------------
-        */
-
-            'service_name' => 'required|string|max:255',
-
-            'service_code' => 'required|string|max:255',
-
-            /*
-        |--------------------------------------------------------------------------
-        | Deskripsi
-        |--------------------------------------------------------------------------
-        */
-
-            'description' => 'nullable|string',
-
-            /*
-        |--------------------------------------------------------------------------
-        | Estimasi Pengiriman
-        |--------------------------------------------------------------------------
-        */
-
+        $validated = $request->validate([
+            'provider'           => 'nullable|string|max:255',  // fix: nullable, blade tidak ada required
+            'courier_name'       => 'required|string|max:255',
+            'courier_code'       => 'required|string|max:255',
+            'service_name'       => 'required|string|max:255',
+            'service_code'       => 'required|string|max:255',
+            'description'        => 'nullable|string',
             'estimated_delivery' => 'nullable|string|max:255',
-
-            /*
-        |--------------------------------------------------------------------------
-        | Fee Tambahan
-        |--------------------------------------------------------------------------
-        */
-
-            'additional_fee' => 'nullable|numeric|min:0',
-
-            /*
-        |--------------------------------------------------------------------------
-        | Status
-        |--------------------------------------------------------------------------
-        */
-
-            'status' => 'required|in:available,not_available',
+            'additional_fee'     => 'nullable|integer|min:0',  // integer sesuai migration bigInteger
+            'status'             => 'required|in:available,unavailable',  // fix: was 'not_available'
         ]);
 
-        /*
-    |--------------------------------------------------------------------------
-    | Simpan shipping method
-    |--------------------------------------------------------------------------
-    */
-        ShippingMethod::create($validatedData);
+        ShippingMethod::create($validated);
 
-        return redirect()
-            ->back()
-            ->with(
-                'success',
-                'Shipping method berhasil ditambahkan.'
-            );
+        return redirect()->back()->with('success', 'Shipping method berhasil ditambahkan.');
     }
 
     public function update(Request $request, ShippingMethod $shippingMethod)
     {
-        $validatedData = $request->validate([
-            'name' => 'required|string|max:255',
-            'shipping_cost' => 'required|numeric',
-            'status' => 'required|in:available,not_available',
+        $validated = $request->validate([
+            // fix: validasi lama pakai 'name' & 'shipping_cost' — field tidak ada di migration/blade
+            'provider'           => 'nullable|string|max:255',
+            'courier_name'       => 'required|string|max:255',
+            'courier_code'       => 'required|string|max:255',
+            'service_name'       => 'required|string|max:255',
+            'service_code'       => 'required|string|max:255',
+            'description'        => 'nullable|string',
+            'estimated_delivery' => 'nullable|string|max:255',
+            'additional_fee'     => 'nullable|integer|min:0',
+            'status'             => 'required|in:available,unavailable',  // ada di form edit
         ]);
 
-        // Perbarui payment method dengan data yang divalidasi
-        $shippingMethod->update($validatedData);
+        $shippingMethod->update($validated);
 
-        return redirect()->back()->with('success', 'Shipping method updated successfully.');
+        return redirect()->back()->with('success', 'Shipping method berhasil diperbarui.');
     }
 
     public function destroy(ShippingMethod $shippingMethod)
     {
         $shippingMethod->delete();
-        return redirect()->back()->with('success', 'Shipping method deleted successfully.');
+
+        return redirect()->back()->with('success', 'Shipping method berhasil dihapus.');
     }
 
     /**

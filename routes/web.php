@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\AddressController;
+use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\Admin\AdminPaymentController;
+use App\Http\Controllers\Admin\AdminShipmentController;
 use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CartController;
@@ -66,6 +69,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('/payment')->name('payment.')->group(function () {
         Route::get('/{order}', [PaymentController::class, 'show'])->name('show');
         Route::post('/notification', [PaymentController::class, 'notification'])->name('notification');
+        Route::get('/{order}/success', [PaymentController::class, 'success'])->name('success');
         Route::get('/{order}/finish', [PaymentController::class, 'finish'])->name('finish');
         Route::get('/{order}/unfinish', [PaymentController::class, 'unfinish'])->name('unfinish');
         Route::get('/{order}/error', [PaymentController::class, 'error'])->name('error');
@@ -136,6 +140,28 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:ad
             Route::put('/{store}', [StoreController::class, 'update'])->name('update');
             Route::delete('/{store}', [StoreController::class, 'destroy'])->name('destroy');
         });
+    });
+
+    Route::prefix('orders')->name('orders.')->group(function () {
+        Route::get('/', [AdminOrderController::class, 'index'])->name('index');
+        Route::get('/{id}', [AdminOrderController::class, 'show'])->name('show');
+        Route::patch('/{id}/process', [AdminOrderController::class, 'process'])->name('process');
+        Route::patch('/{id}/shipment', [AdminOrderController::class, 'shipment'])->name('shipment');
+        Route::patch('/{id}/complete', [AdminOrderController::class, 'complete'])->name('complete');
+        Route::patch('/{id}/cancel', [AdminOrderController::class, 'cancel'])->name('cancel');
+        Route::patch('/{id}/refund', [AdminOrderController::class, 'refund'])->name('refund');
+    });
+
+    Route::prefix('payment')->name('payment.')->group(function () {
+        Route::get('/', [AdminPaymentController::class, 'index'])->name('index');
+        Route::get('/{id}', [AdminPaymentController::class, 'show'])->name('show');
+    });
+
+    Route::prefix('shipment')->name('shipment.')->group(function () {
+        Route::get('/', [AdminShipmentController::class, 'index'])->name('index');
+        Route::get('/{id}', [AdminShipmentController::class, 'show'])->name('show');
+        Route::patch('/{id}/delivered', [AdminShipmentController::class, 'delivered'])->name('delivered');
+        Route::patch('/{id}/cancel', [AdminShipmentController::class, 'cancel'])->name('cancel');
     });
 
     Route::prefix('transactions')->name('transactions.')->group(function () {

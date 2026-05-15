@@ -134,10 +134,10 @@
                 </p>
 
                 {{-- Orders - icon shopping bag / receipt --}}
-                <a href="#" @click="open = false"
+                <a href="{{ route('admin.orders.index') }}" @click="open = false"
                     class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500
            hover:bg-gray-50 hover:text-gray-800
-           {{ request()->routeIs('#') ? 'bg-gray-50 text-gray-900 font-medium' : '' }}">
+           {{ request()->routeIs('admin.orders.index') ? 'bg-gray-50 text-gray-900 font-medium' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -147,10 +147,10 @@
                 </a>
 
                 {{-- Payments - icon credit card --}}
-                <a href="#" @click="open = false"
+                <a href="{{ route('admin.payment.index') }}" @click="open = false"
                     class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500
            hover:bg-gray-50 hover:text-gray-800
-           {{ request()->routeIs('#') ? 'bg-gray-50 text-gray-900 font-medium' : '' }}">
+           {{ request()->routeIs('admin.payment.index') ? 'bg-gray-50 text-gray-900 font-medium' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -160,10 +160,10 @@
                 </a>
 
                 {{-- Shipping - icon truck --}}
-                <a href="#" @click="open = false"
+                <a href="{{ route('admin.shipment.index') }}" @click="open = false"
                     class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500
            hover:bg-gray-50 hover:text-gray-800
-           {{ request()->routeIs('#') ? 'bg-gray-50 text-gray-900 font-medium' : '' }}">
+           {{ request()->routeIs('admin.shipment.index') ? 'bg-gray-50 text-gray-900 font-medium' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
