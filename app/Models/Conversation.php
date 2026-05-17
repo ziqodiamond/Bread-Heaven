@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class FlashSale extends Model
+class Conversation extends Model
 {
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     /*
     |--------------------------------------------------------------------------
@@ -16,7 +17,7 @@ class FlashSale extends Model
     |--------------------------------------------------------------------------
     */
 
-    protected $table = 'flash_sales';
+    protected $table = 'conversations';
 
     /*
     |--------------------------------------------------------------------------
@@ -38,78 +39,76 @@ class FlashSale extends Model
 
         /*
         |--------------------------------------------------------------------------
-        | Informasi Flash Sale
+        | Informasi Conversation
         |--------------------------------------------------------------------------
         */
 
-        'name',
-        'slug',
-        'description',
+        'type',
+        'subject',
 
         /*
         |--------------------------------------------------------------------------
-        | Banner & Thumbnail
+        | Relasi User
         |--------------------------------------------------------------------------
         */
 
-        'banner',
-        'thumbnail',
+        'customer_id',
+        'admin_id',
 
         /*
         |--------------------------------------------------------------------------
-        | Tampilan Promo
+        | Relasi Optional
         |--------------------------------------------------------------------------
         */
 
-        'label',
-        'badge_color',
+        'order_id',
+        'product_id',
 
         /*
         |--------------------------------------------------------------------------
-        | Jadwal Flash Sale
+        | Last Message
         |--------------------------------------------------------------------------
         */
 
-        'start_at',
-        'end_at',
+        'last_message',
+        'last_message_at',
 
         /*
         |--------------------------------------------------------------------------
-        | Status
+        | Unread Counter
+        |--------------------------------------------------------------------------
+        */
+
+        'customer_unread_count',
+        'admin_unread_count',
+
+        /*
+        |--------------------------------------------------------------------------
+        | Status Conversation
         |--------------------------------------------------------------------------
         */
 
         'status',
-        'is_active',
+        'priority',
 
         /*
         |--------------------------------------------------------------------------
-        | Pengaturan Flash Sale
+        | Realtime Metadata
         |--------------------------------------------------------------------------
         */
 
-        'show_countdown',
-        'show_in_homepage',
-        'sort_order',
+        'customer_typing',
+        'admin_typing',
 
         /*
         |--------------------------------------------------------------------------
-        | Analytics
+        | Flags
         |--------------------------------------------------------------------------
         */
 
-        'total_views',
-        'total_orders',
-        'total_items_sold',
-
-        /*
-        |--------------------------------------------------------------------------
-        | SEO
-        |--------------------------------------------------------------------------
-        */
-
-        'meta_title',
-        'meta_description',
+        'is_read_by_admin',
+        'is_read_by_customer',
+        'is_pinned',
     ];
 
     /*
@@ -128,21 +127,15 @@ class FlashSale extends Model
             |--------------------------------------------------------------------------
             */
 
-            'is_active' => 'boolean',
+            'customer_typing' => 'boolean',
 
-            'show_countdown' => 'boolean',
+            'admin_typing' => 'boolean',
 
-            'show_in_homepage' => 'boolean',
+            'is_read_by_admin' => 'boolean',
 
-            /*
-            |--------------------------------------------------------------------------
-            | Timestamp
-            |--------------------------------------------------------------------------
-            */
+            'is_read_by_customer' => 'boolean',
 
-            'start_at' => 'datetime',
-
-            'end_at' => 'datetime',
+            'is_pinned' => 'boolean',
 
             /*
             |--------------------------------------------------------------------------
@@ -150,13 +143,17 @@ class FlashSale extends Model
             |--------------------------------------------------------------------------
             */
 
-            'sort_order' => 'integer',
+            'customer_unread_count' => 'integer',
 
-            'total_views' => 'integer',
+            'admin_unread_count' => 'integer',
 
-            'total_orders' => 'integer',
+            /*
+            |--------------------------------------------------------------------------
+            | Timestamp
+            |--------------------------------------------------------------------------
+            */
 
-            'total_items_sold' => 'integer',
+            'last_message_at' => 'datetime',
         ];
     }
 
@@ -167,13 +164,65 @@ class FlashSale extends Model
     */
 
     /**
-     * Relasi item flash sale
+     * Relasi customer
      */
-    public function items()
+    public function customer()
+    {
+        return $this->belongsTo(
+            User::class,
+            'customer_id'
+        );
+    }
+
+    /**
+     * Relasi admin
+     */
+    public function admin()
+    {
+        return $this->belongsTo(
+            User::class,
+            'admin_id'
+        );
+    }
+
+    /**
+     * Relasi order
+     */
+    public function order()
+    {
+        return $this->belongsTo(
+            Order::class
+        );
+    }
+
+    /**
+     * Relasi produk
+     */
+    public function product()
+    {
+        return $this->belongsTo(
+            Product::class
+        );
+    }
+
+    /**
+     * Relasi messages
+     */
+    public function messages()
     {
         return $this->hasMany(
-            FlashSaleItem::class
+            Message::class
         );
+    }
+
+    /**
+     * Last message realtime
+     */
+    public function latestMessage()
+    {
+        return $this->hasOne(
+            Message::class
+        )->latestOfMany();
     }
 
     /*
@@ -183,73 +232,61 @@ class FlashSale extends Model
     */
 
     /**
-     * Mengecek flash sale sudah dimulai
+     * Mengecek conversation masih aktif
      */
-    public function getHasStartedAttribute(): bool
+    public function getIsOpenAttribute(): bool
     {
-        return now()->gte(
-            $this->start_at
-        );
+        return $this->status === 'open';
     }
 
     /**
-     * Mengecek flash sale sudah selesai
+     * Mengecek conversation selesai
      */
-    public function getHasEndedAttribute(): bool
+    public function getIsResolvedAttribute(): bool
     {
-        return now()->gt(
-            $this->end_at
-        );
+        return $this->status === 'resolved';
     }
 
     /**
-     * Mengecek flash sale aktif
+     * Mengecek conversation closed
      */
-    public function getIsRunningAttribute(): bool
+    public function getIsClosedAttribute(): bool
+    {
+        return $this->status === 'closed';
+    }
+
+    /**
+     * Mengecek ada unread admin
+     */
+    public function getHasUnreadAdminAttribute(): bool
     {
         return
-            $this->is_active &&
-            !$this->has_ended &&
-            $this->has_started;
+            $this->admin_unread_count > 0;
     }
 
     /**
-     * Countdown flash sale
+     * Mengecek ada unread customer
      */
-    public function getRemainingSecondsAttribute(): int
+    public function getHasUnreadCustomerAttribute(): bool
     {
-        if (!$this->is_running) {
-            return 0;
-        }
-
-        return now()->diffInSeconds(
-            $this->end_at,
-            false
-        );
+        return
+            $this->customer_unread_count > 0;
     }
 
     /**
-     * URL banner
+     * Mengecek customer sedang mengetik
      */
-    public function getBannerUrlAttribute(): ?string
+    public function getCustomerIsTypingAttribute(): bool
     {
-        return $this->banner
-            ? asset(
-                'storage/' . $this->banner
-            )
-            : null;
+        return $this->customer_typing;
     }
 
     /**
-     * URL thumbnail
+     * Mengecek admin sedang mengetik
      */
-    public function getThumbnailUrlAttribute(): ?string
+    public function getAdminIsTypingAttribute(): bool
     {
-        return $this->thumbnail
-            ? asset(
-                'storage/' . $this->thumbnail
-            )
-            : null;
+        return $this->admin_typing;
     }
 
     /*
@@ -259,53 +296,37 @@ class FlashSale extends Model
     */
 
     /**
-     * Flash sale aktif
+     * Conversation open
      */
-    public function scopeActive($query)
-    {
-        return $query
-
-            ->where(
-                'is_active',
-                true
-            )
-
-            ->whereIn('status', [
-                'active',
-                'scheduled',
-            ]);
-    }
-
-    /**
-     * Flash sale berjalan
-     */
-    public function scopeRunning($query)
-    {
-        return $query
-
-            ->active()
-
-            ->where(
-                'start_at',
-                '<=',
-                now()
-            )
-
-            ->where(
-                'end_at',
-                '>=',
-                now()
-            );
-    }
-
-    /**
-     * Tampilkan di homepage
-     */
-    public function scopeHomepage($query)
+    public function scopeOpen($query)
     {
         return $query->where(
-            'show_in_homepage',
-            true
+            'status',
+            'open'
+        );
+    }
+
+    /**
+     * Conversation prioritas tinggi
+     */
+    public function scopePriority($query)
+    {
+        return $query->whereIn(
+            'priority',
+            ['high', 'urgent']
+        );
+    }
+
+    /**
+     * Conversation customer
+     */
+    public function scopeCustomer(
+        $query,
+        string $customerId
+    ) {
+        return $query->where(
+            'customer_id',
+            $customerId
         );
     }
 
@@ -316,76 +337,75 @@ class FlashSale extends Model
     */
 
     /**
-     * Increment total views
+     * Mark read admin
      */
-    public function incrementViews(): void
+    public function markAsReadByAdmin(): void
     {
-        $this->increment(
-            'total_views'
-        );
-    }
-
-    /**
-     * Increment total order
-     */
-    public function incrementOrders(
-        int $count = 1
-    ): void {
-        $this->increment(
-            'total_orders',
-            $count
-        );
-    }
-
-    /**
-     * Increment total item sold
-     */
-    public function incrementItemsSold(
-        int $count = 1
-    ): void {
-        $this->increment(
-            'total_items_sold',
-            $count
-        );
-    }
-
-    /**
-     * Update status otomatis
-     */
-    public function refreshStatus(): void
-    {
-        if (!$this->is_active) {
-
-            $this->update([
-                'status' => 'cancelled',
-            ]);
-
-            return;
-        }
-
-        if (now()->lt($this->start_at)) {
-
-            $this->update([
-                'status' => 'scheduled',
-            ]);
-
-            return;
-        }
-
-        if (now()->between(
-            $this->start_at,
-            $this->end_at
-        )) {
-
-            $this->update([
-                'status' => 'active',
-            ]);
-
-            return;
-        }
-
         $this->update([
-            'status' => 'expired',
+
+            'is_read_by_admin' => true,
+
+            'admin_unread_count' => 0,
+        ]);
+    }
+
+    /**
+     * Mark read customer
+     */
+    public function markAsReadByCustomer(): void
+    {
+        $this->update([
+
+            'is_read_by_customer' => true,
+
+            'customer_unread_count' => 0,
+        ]);
+    }
+
+    /**
+     * Mark resolved
+     */
+    public function resolve(): void
+    {
+        $this->update([
+
+            'status' => 'resolved',
+        ]);
+    }
+
+    /**
+     * Close conversation
+     */
+    public function close(): void
+    {
+        $this->update([
+
+            'status' => 'closed',
+        ]);
+    }
+
+    /**
+     * Reopen conversation
+     */
+    public function reopen(): void
+    {
+        $this->update([
+
+            'status' => 'open',
+        ]);
+    }
+
+    /**
+     * Update last message
+     */
+    public function updateLastMessage(
+        string $message
+    ): void {
+        $this->update([
+
+            'last_message' => $message,
+
+            'last_message_at' => now(),
         ]);
     }
 }

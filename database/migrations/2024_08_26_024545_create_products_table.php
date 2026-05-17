@@ -52,41 +52,82 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            // Harga produk dalam rupiah
+            // Harga asli produk dalam rupiah
             // Contoh:
             // 150000 = Rp150.000
             $table->bigInteger('price');
 
+            /*
+            |--------------------------------------------------------------------------
+            | Discount Product
+            |--------------------------------------------------------------------------
+            | Harga promo / harga coret produk
+            |--------------------------------------------------------------------------
+            */
+
+            // Harga setelah diskon
+            // Contoh:
+            // price      = 100000
+            // sale_price = 75000
+            $table->bigInteger('sale_price')
+                ->nullable();
+
+            // Jadwal mulai diskon
+            $table->timestamp('discount_start_at')
+                ->nullable();
+
+            // Jadwal selesai diskon
+            $table->timestamp('discount_end_at')
+                ->nullable();
+
+            // Label promo
+            // Contoh:
+            // Flash Sale
+            // Promo Ramadhan
+            // Diskon Spesial
+            $table->string('discount_label')
+                ->nullable();
+
+            // Tipe diskon produk
+            // percent = diskon persen
+            // fixed   = potongan langsung
+            $table->enum('discount_type', [
+                'percent',
+                'fixed',
+            ])->nullable();
+
+            // Nilai diskon
+            // Contoh:
+            // 10 = 10%
+            // 5000 = Rp5.000
+            $table->bigInteger('discount_value')
+                ->nullable();
+
             // Stok produk
-            $table->unsignedInteger('stock')->default(0);
+            $table->unsignedInteger('stock')
+                ->default(0);
 
             /*
             |--------------------------------------------------------------------------
             | Informasi Shipping
             |--------------------------------------------------------------------------
-            | Dibutuhkan untuk cek ongkir Biteship/RajaOngkir
+            | Dibutuhkan untuk cek ongkir Biteship
             |--------------------------------------------------------------------------
             */
 
             // Berat produk dalam gram
-            $table->unsignedInteger('weight')->default(0);
+            $table->unsignedInteger('weight')
+                ->default(0);
 
             // Dimensi produk (opsional)
-            $table->unsignedInteger('length')->nullable();
-            $table->unsignedInteger('width')->nullable();
-            $table->unsignedInteger('height')->nullable();
+            $table->unsignedInteger('length')
+                ->nullable();
 
-            /*
-            |--------------------------------------------------------------------------
-            | discount
-            |--------------------------------------------------------------------------
-            */
-            $table->bigInteger('sale_price')->nullable();
+            $table->unsignedInteger('width')
+                ->nullable();
 
-            $table->timestamp('discount_start_at')->nullable();
-            $table->timestamp('discount_end_at')->nullable();
-
-            $table->string('discount_label')->nullable();
+            $table->unsignedInteger('height')
+                ->nullable();
 
             /*
             |--------------------------------------------------------------------------

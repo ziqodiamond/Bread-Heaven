@@ -98,11 +98,45 @@ class Order extends Model
         |--------------------------------------------------------------------------
         */
 
+        // Total produk sebelum discount
         'subtotal',
-        'shipping_cost',
-        'service_fee',
+
+        // Total discount produk/voucher
         'discount_amount',
+
+        // Discount ongkir
+        'shipping_discount',
+
+        // Ongkir asli
+        'shipping_cost',
+
+        // Ongkir final
+        'final_shipping_cost',
+
+        // Fee payment gateway
+        'service_fee',
+
+        // Total akhir pembayaran
         'grand_total',
+
+        /*
+        |--------------------------------------------------------------------------
+        | Informasi Voucher
+        |--------------------------------------------------------------------------
+        */
+
+        'voucher_code',
+        'voucher_name',
+        'voucher_type',
+        'voucher_value',
+
+        /*
+        |--------------------------------------------------------------------------
+        | Informasi Discount
+        |--------------------------------------------------------------------------
+        */
+
+        'discount_source',
 
         /*
         |--------------------------------------------------------------------------
@@ -159,19 +193,46 @@ class Order extends Model
     {
         return [
 
-            // Harga bigint
+            /*
+            |--------------------------------------------------------------------------
+            | Harga bigint
+            |--------------------------------------------------------------------------
+            */
+
             'subtotal' => 'integer',
-            'shipping_cost' => 'integer',
-            'service_fee' => 'integer',
+
             'discount_amount' => 'integer',
+
+            'shipping_discount' => 'integer',
+
+            'shipping_cost' => 'integer',
+
+            'final_shipping_cost' => 'integer',
+
+            'service_fee' => 'integer',
+
             'grand_total' => 'integer',
 
-            // Berat
+            'voucher_value' => 'integer',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Berat
+            |--------------------------------------------------------------------------
+            */
+
             'total_weight' => 'integer',
 
-            // Timestamp
+            /*
+            |--------------------------------------------------------------------------
+            | Timestamp
+            |--------------------------------------------------------------------------
+            */
+
             'paid_at' => 'datetime',
+
             'shipped_at' => 'datetime',
+
             'completed_at' => 'datetime',
         ];
     }
@@ -206,7 +267,9 @@ class Order extends Model
      */
     public function paymentMethod()
     {
-        return $this->belongsTo(PaymentMethod::class);
+        return $this->belongsTo(
+            PaymentMethod::class
+        );
     }
 
     /**
@@ -214,7 +277,9 @@ class Order extends Model
      */
     public function items()
     {
-        return $this->hasMany(OrderItem::class);
+        return $this->hasMany(
+            OrderItem::class
+        );
     }
 
     /**
@@ -222,7 +287,9 @@ class Order extends Model
      */
     public function paymentTransactions()
     {
-        return $this->hasMany(PaymentTransaction::class);
+        return $this->hasMany(
+            PaymentTransaction::class
+        );
     }
 
     /**
@@ -230,7 +297,9 @@ class Order extends Model
      */
     public function shippingRates()
     {
-        return $this->hasMany(ShippingRate::class);
+        return $this->hasMany(
+            ShippingRate::class
+        );
     }
 
     /**
@@ -238,7 +307,9 @@ class Order extends Model
      */
     public function shipments()
     {
-        return $this->hasMany(Shipment::class);
+        return $this->hasMany(
+            Shipment::class
+        );
     }
 
     /*
@@ -262,7 +333,12 @@ class Order extends Model
                     'INV-' .
                     now()->format('Ymd') .
                     '-' .
-                    strtoupper(substr(uniqid(), -6));
+                    strtoupper(
+                        substr(
+                            uniqid(),
+                            -6
+                        )
+                    );
             }
         });
     }
@@ -297,6 +373,33 @@ class Order extends Model
         return $this->order_status === 'completed';
     }
 
+    /**
+     * Mengecek order memakai voucher
+     */
+    public function getHasVoucherAttribute(): bool
+    {
+        return !empty($this->voucher_code);
+    }
+
+    /**
+     * Mengecek order free shipping
+     */
+    public function getHasFreeShippingAttribute(): bool
+    {
+        return $this->shipping_discount > 0;
+    }
+
+    /**
+     * Total pembayaran sebelum discount
+     */
+    public function getOriginalGrandTotalAttribute(): int
+    {
+        return
+            $this->subtotal +
+            $this->shipping_cost +
+            $this->service_fee;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Helper Methods
@@ -309,9 +412,12 @@ class Order extends Model
     public function markAsPaid(): void
     {
         $this->update([
+
             'payment_status' => 'paid',
-            'order_status'   => 'processing', // ✅ lebih proper
-            'paid_at'        => now(),
+
+            'order_status' => 'processing',
+
+            'paid_at' => now(),
         ]);
     }
 
@@ -352,6 +458,19 @@ class Order extends Model
         $this->update([
 
             'order_status' => 'cancelled',
+        ]);
+    }
+
+    /**
+     * Mark order refunded
+     */
+    public function refund(): void
+    {
+        $this->update([
+
+            'order_status' => 'refunded',
+
+            'payment_status' => 'refunded',
         ]);
     }
 }

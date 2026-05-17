@@ -32,18 +32,38 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $fillable = [
 
-        // Informasi user
+        /*
+        |--------------------------------------------------------------------------
+        | Informasi User
+        |--------------------------------------------------------------------------
+        */
+
         'name',
         'email',
         'phone',
 
-        // Authentication
+        /*
+        |--------------------------------------------------------------------------
+        | Authentication
+        |--------------------------------------------------------------------------
+        */
+
         'password',
 
-        // Role
+        /*
+        |--------------------------------------------------------------------------
+        | Role
+        |--------------------------------------------------------------------------
+        */
+
         'role',
 
-        // Foto profil
+        /*
+        |--------------------------------------------------------------------------
+        | Foto Profil
+        |--------------------------------------------------------------------------
+        */
+
         'profile_photo_path',
     ];
 
@@ -69,10 +89,20 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
 
-            // Email verification
+            /*
+            |--------------------------------------------------------------------------
+            | Email Verification
+            |--------------------------------------------------------------------------
+            */
+
             'email_verified_at' => 'datetime',
 
-            // Auto hashing password
+            /*
+            |--------------------------------------------------------------------------
+            | Auto Hashing Password
+            |--------------------------------------------------------------------------
+            */
+
             'password' => 'hashed',
         ];
     }
@@ -88,7 +118,9 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function cart()
     {
-        return $this->hasOne(Cart::class);
+        return $this->hasOne(
+            Cart::class
+        );
     }
 
     /**
@@ -109,7 +141,9 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function addresses()
     {
-        return $this->hasMany(UserAddress::class);
+        return $this->hasMany(
+            UserAddress::class
+        );
     }
 
     /**
@@ -117,7 +151,19 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function orders()
     {
-        return $this->hasMany(Order::class);
+        return $this->hasMany(
+            Order::class
+        );
+    }
+
+    /**
+     * Relasi penggunaan voucher
+     */
+    public function voucherUsages()
+    {
+        return $this->hasMany(
+            VoucherUsage::class
+        );
     }
 
     /*
@@ -151,8 +197,59 @@ class User extends Authenticatable implements MustVerifyEmail
     public function getProfilePhotoUrlAttribute(): string
     {
         return $this->profile_photo_path
-            ? asset('storage/' . $this->profile_photo_path)
-            : asset('images/guest.jpg');
+            ? asset(
+                'storage/' .
+                    $this->profile_photo_path
+            )
+            : asset(
+                'images/guest.jpg'
+            );
+    }
+
+    /**
+     * Total order user
+     */
+    public function getTotalOrdersAttribute(): int
+    {
+        return $this->orders()
+            ->count();
+    }
+
+    /**
+     * Total transaksi user
+     */
+    public function getTotalSpentAttribute(): int
+    {
+        return (int) $this->orders()
+
+            ->where(
+                'payment_status',
+                'paid'
+            )
+
+            ->sum('grand_total');
+    }
+
+    /**
+     * Total penghematan voucher
+     */
+    public function getTotalSavingsAttribute(): int
+    {
+        return (int) $this->voucherUsages()
+
+            ->where(
+                'status',
+                'used'
+            )
+
+            ->get()
+
+            ->sum(function ($usage) {
+
+                return
+                    $usage->discount_amount +
+                    $usage->shipping_discount;
+            });
     }
 
     /*
@@ -167,7 +264,12 @@ class User extends Authenticatable implements MustVerifyEmail
     public function defaultAddress()
     {
         return $this->addresses()
-            ->where('is_default', true)
+
+            ->where(
+                'is_default',
+                true
+            )
+
             ->first();
     }
 
@@ -177,7 +279,54 @@ class User extends Authenticatable implements MustVerifyEmail
     public function activeCart()
     {
         return $this->cart()
-            ->where('status', 'active')
+
+            ->where(
+                'status',
+                'active'
+            )
+
             ->first();
+    }
+
+    /**
+     * Mengecek user pernah memakai voucher
+     */
+    public function hasUsedVoucher(
+        string $voucherId
+    ): bool {
+        return $this->voucherUsages()
+
+            ->where(
+                'voucher_id',
+                $voucherId
+            )
+
+            ->where(
+                'status',
+                'used'
+            )
+
+            ->exists();
+    }
+
+    /**
+     * Total penggunaan voucher user
+     */
+    public function voucherUsageCount(
+        string $voucherId
+    ): int {
+        return $this->voucherUsages()
+
+            ->where(
+                'voucher_id',
+                $voucherId
+            )
+
+            ->where(
+                'status',
+                'used'
+            )
+
+            ->count();
     }
 }

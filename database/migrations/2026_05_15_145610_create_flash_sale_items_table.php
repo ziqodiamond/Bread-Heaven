@@ -13,120 +13,118 @@ return new class extends Migration
     {
         /*
         |--------------------------------------------------------------------------
-        | Flash Sales Table
+        | Flash Sale Items Table
         |--------------------------------------------------------------------------
-        | Menyimpan event flash sale / promo campaign
+        | Menyimpan produk yang masuk flash sale
         |--------------------------------------------------------------------------
         */
-        Schema::create('flash_sales', function (Blueprint $table) {
+        Schema::create('flash_sale_items', function (Blueprint $table) {
 
             // Primary UUID
             $table->uuid('id')->primary();
 
             /*
             |--------------------------------------------------------------------------
-            | Informasi Flash Sale
+            | Relasi
             |--------------------------------------------------------------------------
             */
 
-            // Nama flash sale
-            // Contoh:
-            // Midnight Sale
-            // Ramadhan Sale
-            // Payday Sale
-            $table->string('name');
+            // Relasi flash sale
+            $table->foreignUuid('flash_sale_id')
+                ->constrained('flash_sales')
+                ->cascadeOnDelete();
 
-            // Slug SEO / URL
-            $table->string('slug')
-                ->unique();
+            // Relasi produk
+            $table->foreignUuid('product_id')
+                ->constrained('products')
+                ->cascadeOnDelete();
 
-            // Deskripsi flash sale
-            $table->longText('description')
+            /*
+            |--------------------------------------------------------------------------
+            | Snapshot Produk
+            |--------------------------------------------------------------------------
+            */
+
+            // Nama produk
+            $table->string('product_name');
+
+            // SKU produk
+            $table->string('product_sku');
+
+            // Thumbnail produk
+            $table->string('product_image_url')
                 ->nullable();
 
             /*
             |--------------------------------------------------------------------------
-            | Banner & Thumbnail
+            | Harga Flash Sale
             |--------------------------------------------------------------------------
             */
 
-            // Banner utama
-            $table->string('banner')
-                ->nullable();
+            // Harga asli produk
+            $table->bigInteger('original_price')
+                ->default(0);
 
-            // Thumbnail
-            $table->string('thumbnail')
-                ->nullable();
+            // Harga flash sale
+            $table->bigInteger('sale_price')
+                ->default(0);
+
+            // Tipe discount
+            // percent
+            // fixed
+            $table->enum('discount_type', [
+                'percent',
+                'fixed',
+            ]);
+
+            // Nilai discount
+            $table->bigInteger('discount_value')
+                ->default(0);
+
+            // Persentase discount
+            $table->unsignedInteger('discount_percentage')
+                ->default(0);
 
             /*
             |--------------------------------------------------------------------------
-            | Tampilan Promo
+            | Stock Flash Sale
             |--------------------------------------------------------------------------
             */
 
-            // Label promo
-            // Contoh:
-            // FLASH SALE
-            // SUPER DEAL
-            $table->string('label')
-                ->nullable();
+            // Limit stok flash sale
+            $table->unsignedInteger('stock_limit')
+                ->default(0);
 
-            // Warna badge
-            // Contoh:
-            // red
-            // orange
-            // yellow
-            $table->string('badge_color')
-                ->nullable();
+            // Total stok terjual
+            $table->unsignedInteger('sold_quantity')
+                ->default(0);
+
+            // Maksimal pembelian per user
+            $table->unsignedInteger('max_purchase_per_user')
+                ->default(1);
 
             /*
             |--------------------------------------------------------------------------
-            | Jadwal Flash Sale
+            | Status Flash Sale Item
             |--------------------------------------------------------------------------
             */
 
-            // Waktu mulai
-            $table->timestamp('start_at');
-
-            // Waktu selesai
-            $table->timestamp('end_at');
-
-            /*
-            |--------------------------------------------------------------------------
-            | Status Flash Sale
-            |--------------------------------------------------------------------------
-            */
-
-            // Draft / publish
-            $table->enum('status', [
-                'draft',
-                'scheduled',
-                'active',
-                'expired',
-                'cancelled',
-            ])->default('draft');
-
-            // Aktif/nonaktif
             $table->boolean('is_active')
                 ->default(true);
 
             /*
             |--------------------------------------------------------------------------
-            | Pengaturan Flash Sale
+            | Informasi Tambahan
             |--------------------------------------------------------------------------
             */
-
-            // Tampilkan countdown
-            $table->boolean('show_countdown')
-                ->default(true);
-
-            // Tampilkan di homepage
-            $table->boolean('show_in_homepage')
-                ->default(true);
 
             // Prioritas sorting
             $table->unsignedInteger('sort_order')
                 ->default(0);
+
+            // Badge promo custom
+            $table->string('badge_label')
+                ->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -134,29 +132,25 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            // Total view flash sale
+            // Total view item
             $table->unsignedBigInteger('total_views')
                 ->default(0);
 
-            // Total transaksi
-            $table->unsignedBigInteger('total_orders')
-                ->default(0);
-
-            // Total item terjual
-            $table->unsignedBigInteger('total_items_sold')
+            // Total checkout
+            $table->unsignedBigInteger('total_checkouts')
                 ->default(0);
 
             /*
             |--------------------------------------------------------------------------
-            | SEO
+            | Constraint
             |--------------------------------------------------------------------------
             */
 
-            $table->string('meta_title')
-                ->nullable();
-
-            $table->text('meta_description')
-                ->nullable();
+            // Mencegah duplicate produk
+            $table->unique([
+                'flash_sale_id',
+                'product_id',
+            ]);
 
             $table->timestamps();
         });
@@ -167,6 +161,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('flash_sales');
+        Schema::dropIfExists('flash_sale_items');
     }
 };

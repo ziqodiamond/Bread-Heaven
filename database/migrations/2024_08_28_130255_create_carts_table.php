@@ -56,14 +56,44 @@ return new class extends Migration
             */
 
             // Total item unik dalam cart
-            $table->unsignedInteger('total_items')->default(0);
+            $table->unsignedInteger('total_items')
+                ->default(0);
 
             // Total quantity seluruh item
-            $table->unsignedInteger('total_quantity')->default(0);
+            $table->unsignedInteger('total_quantity')
+                ->default(0);
 
-            // Subtotal cart
-            // Menggunakan bigint agar aman untuk transaksi
-            $table->bigInteger('subtotal')->default(0);
+            /*
+            |--------------------------------------------------------------------------
+            | Perhitungan Harga
+            |--------------------------------------------------------------------------
+            */
+
+            // Subtotal sebelum discount
+            $table->bigInteger('subtotal')
+                ->default(0);
+
+            // Total discount cart
+            $table->bigInteger('discount_amount')
+                ->default(0);
+
+            // Subtotal setelah discount
+            $table->bigInteger('final_subtotal')
+                ->default(0);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Voucher / Coupon
+            |--------------------------------------------------------------------------
+            */
+
+            // Kode voucher yang dipakai
+            $table->string('voucher_code')
+                ->nullable();
+
+            // Snapshot voucher
+            $table->string('voucher_name')
+                ->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -73,7 +103,8 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            $table->timestamp('expired_at')->nullable();
+            $table->timestamp('expired_at')
+                ->nullable();
 
             $table->timestamps();
         });

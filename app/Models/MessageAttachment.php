@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class VoucherUsage extends Model
+class MessageAttachment extends Model
 {
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     /*
     |--------------------------------------------------------------------------
@@ -16,7 +17,7 @@ class VoucherUsage extends Model
     |--------------------------------------------------------------------------
     */
 
-    protected $table = 'voucher_usages';
+    protected $table = 'message_attachments';
 
     /*
     |--------------------------------------------------------------------------
@@ -42,64 +43,53 @@ class VoucherUsage extends Model
         |--------------------------------------------------------------------------
         */
 
-        'voucher_id',
-        'user_id',
-        'order_id',
+        'message_id',
 
         /*
         |--------------------------------------------------------------------------
-        | Snapshot Voucher
+        | Informasi File
         |--------------------------------------------------------------------------
         */
 
-        'voucher_name',
-        'voucher_code',
-        'voucher_type',
+        'file_name',
+        'stored_file_name',
+        'file_path',
 
         /*
         |--------------------------------------------------------------------------
-        | Snapshot Discount
+        | Metadata File
         |--------------------------------------------------------------------------
         */
 
-        'voucher_value',
-        'discount_amount',
-        'shipping_discount',
+        'mime_type',
+        'extension',
+        'file_size',
 
         /*
         |--------------------------------------------------------------------------
-        | Snapshot Order
+        | Tipe Attachment
         |--------------------------------------------------------------------------
         */
 
-        'invoice_number',
-        'order_subtotal',
-        'order_grand_total',
+        'type',
 
         /*
         |--------------------------------------------------------------------------
-        | Status Penggunaan Voucher
+        | Metadata Media
         |--------------------------------------------------------------------------
         */
 
-        'status',
+        'width',
+        'height',
+        'duration',
 
         /*
         |--------------------------------------------------------------------------
-        | Metadata
+        | Flags
         |--------------------------------------------------------------------------
         */
 
-        'ip_address',
-        'user_agent',
-
-        /*
-        |--------------------------------------------------------------------------
-        | Timestamp
-        |--------------------------------------------------------------------------
-        */
-
-        'used_at',
+        'is_deleted',
     ];
 
     /*
@@ -114,27 +104,25 @@ class VoucherUsage extends Model
 
             /*
             |--------------------------------------------------------------------------
-            | Harga
+            | Integer
             |--------------------------------------------------------------------------
             */
 
-            'voucher_value' => 'integer',
+            'file_size' => 'integer',
 
-            'discount_amount' => 'integer',
+            'width' => 'integer',
 
-            'shipping_discount' => 'integer',
+            'height' => 'integer',
 
-            'order_subtotal' => 'integer',
-
-            'order_grand_total' => 'integer',
+            'duration' => 'integer',
 
             /*
             |--------------------------------------------------------------------------
-            | Timestamp
+            | Boolean
             |--------------------------------------------------------------------------
             */
 
-            'used_at' => 'datetime',
+            'is_deleted' => 'boolean',
         ];
     }
 
@@ -145,32 +133,12 @@ class VoucherUsage extends Model
     */
 
     /**
-     * Relasi voucher
+     * Relasi message
      */
-    public function voucher()
+    public function message()
     {
         return $this->belongsTo(
-            Voucher::class
-        );
-    }
-
-    /**
-     * Relasi user
-     */
-    public function user()
-    {
-        return $this->belongsTo(
-            User::class
-        );
-    }
-
-    /**
-     * Relasi order
-     */
-    public function order()
-    {
-        return $this->belongsTo(
-            Order::class
+            Message::class
         );
     }
 
@@ -181,37 +149,92 @@ class VoucherUsage extends Model
     */
 
     /**
-     * Mengecek voucher sudah digunakan
+     * URL file attachment
      */
-    public function getIsUsedAttribute(): bool
+    public function getUrlAttribute(): string
     {
-        return $this->status === 'used';
+        return asset(
+            'storage/' .
+                $this->file_path
+        );
     }
 
     /**
-     * Mengecek voucher dibatalkan
+     * Mengecek attachment image
      */
-    public function getIsCancelledAttribute(): bool
+    public function getIsImageAttribute(): bool
     {
-        return $this->status === 'cancelled';
+        return $this->type === 'image';
     }
 
     /**
-     * Mengecek voucher direfund
+     * Mengecek attachment video
      */
-    public function getIsRefundedAttribute(): bool
+    public function getIsVideoAttribute(): bool
     {
-        return $this->status === 'refunded';
+        return $this->type === 'video';
     }
 
     /**
-     * Total penghematan voucher
+     * Mengecek attachment audio
      */
-    public function getTotalSavingAttribute(): int
+    public function getIsAudioAttribute(): bool
     {
-        return
-            $this->discount_amount +
-            $this->shipping_discount;
+        return $this->type === 'audio';
+    }
+
+    /**
+     * Mengecek attachment file
+     */
+    public function getIsFileAttribute(): bool
+    {
+        return $this->type === 'file';
+    }
+
+    /**
+     * Format ukuran file
+     */
+    public function getFormattedSizeAttribute(): string
+    {
+        $bytes = $this->file_size;
+
+        if ($bytes >= 1073741824) {
+
+            return number_format(
+                $bytes / 1073741824,
+                2
+            ) . ' GB';
+        }
+
+        if ($bytes >= 1048576) {
+
+            return number_format(
+                $bytes / 1048576,
+                2
+            ) . ' MB';
+        }
+
+        if ($bytes >= 1024) {
+
+            return number_format(
+                $bytes / 1024,
+                2
+            ) . ' KB';
+        }
+
+        return $bytes . ' B';
+    }
+
+    /**
+     * Thumbnail attachment
+     */
+    public function getThumbnailAttribute(): ?string
+    {
+        if (!$this->is_image) {
+            return null;
+        }
+
+        return $this->url;
     }
 
     /*
@@ -221,37 +244,35 @@ class VoucherUsage extends Model
     */
 
     /**
-     * Voucher usage aktif
+     * Attachment image
      */
-    public function scopeUsed($query)
+    public function scopeImages($query)
     {
         return $query->where(
-            'status',
-            'used'
+            'type',
+            'image'
         );
     }
 
     /**
-     * Voucher usage refunded
+     * Attachment video
      */
-    public function scopeRefunded($query)
+    public function scopeVideos($query)
     {
         return $query->where(
-            'status',
-            'refunded'
+            'type',
+            'video'
         );
     }
 
     /**
-     * Filter voucher code
+     * Attachment file
      */
-    public function scopeVoucherCode(
-        $query,
-        string $code
-    ) {
+    public function scopeFiles($query)
+    {
         return $query->where(
-            'voucher_code',
-            $code
+            'type',
+            'file'
         );
     }
 
@@ -262,37 +283,23 @@ class VoucherUsage extends Model
     */
 
     /**
-     * Mark voucher usage cancelled
+     * Soft delete attachment
      */
-    public function markAsCancelled(): void
+    public function softDeleteAttachment(): void
     {
         $this->update([
 
-            'status' => 'cancelled',
+            'is_deleted' => true,
         ]);
     }
 
     /**
-     * Mark voucher usage refunded
+     * Mendapatkan extension uppercase
      */
-    public function markAsRefunded(): void
+    public function extensionUpper(): string
     {
-        $this->update([
-
-            'status' => 'refunded',
-        ]);
-    }
-
-    /**
-     * Mark voucher usage used
-     */
-    public function markAsUsed(): void
-    {
-        $this->update([
-
-            'status' => 'used',
-
-            'used_at' => now(),
-        ]);
+        return strtoupper(
+            $this->extension ?? ''
+        );
     }
 }

@@ -13,12 +13,12 @@ return new class extends Migration
     {
         /*
         |--------------------------------------------------------------------------
-        | Voucher Usages Table
+        | Message Attachments Table
         |--------------------------------------------------------------------------
-        | Menyimpan histori penggunaan voucher
+        | Menyimpan file attachment chat
         |--------------------------------------------------------------------------
         */
-        Schema::create('voucher_usages', function (Blueprint $table) {
+        Schema::create('message_attachments', function (Blueprint $table) {
 
             // Primary UUID
             $table->uuid('id')->primary();
@@ -29,114 +29,100 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            // Relasi voucher
-            $table->foreignUuid('voucher_id')
-                ->constrained('vouchers')
+            // Relasi message
+            $table->foreignUuid('message_id')
+                ->constrained('messages')
                 ->cascadeOnDelete();
 
-            // Relasi user
-            $table->foreignUuid('user_id')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete();
-
-            // Relasi order
-            $table->foreignUuid('order_id')
-                ->nullable()
-                ->constrained('orders')
-                ->nullOnDelete();
-
             /*
             |--------------------------------------------------------------------------
-            | Snapshot Voucher
+            | Informasi File
             |--------------------------------------------------------------------------
             */
 
-            // Nama voucher
-            $table->string('voucher_name');
+            // Nama asli file
+            $table->string('file_name');
 
-            // Kode voucher
-            $table->string('voucher_code');
+            // Nama file storage
+            $table->string('stored_file_name');
 
-            // Jenis voucher
-            $table->string('voucher_type');
-
-            /*
-            |--------------------------------------------------------------------------
-            | Snapshot Discount
-            |--------------------------------------------------------------------------
-            */
-
-            // Nilai voucher
-            $table->bigInteger('voucher_value')
-                ->default(0);
-
-            // Jumlah discount yang didapat
-            $table->bigInteger('discount_amount')
-                ->default(0);
-
-            // Discount ongkir
-            $table->bigInteger('shipping_discount')
-                ->default(0);
+            // Path file
+            $table->string('file_path');
 
             /*
             |--------------------------------------------------------------------------
-            | Snapshot Order
+            | Metadata File
             |--------------------------------------------------------------------------
             */
 
-            // Invoice order
-            $table->string('invoice_number')
+            // MIME type
+            // image/png
+            // application/pdf
+            $table->string('mime_type');
+
+            // Extension file
+            // png
+            // jpg
+            // pdf
+            $table->string('extension')
                 ->nullable();
 
-            // Total belanja saat voucher dipakai
-            $table->bigInteger('order_subtotal')
-                ->default(0);
-
-            // Grand total order
-            $table->bigInteger('order_grand_total')
+            // Size file dalam bytes
+            $table->unsignedBigInteger('file_size')
                 ->default(0);
 
             /*
             |--------------------------------------------------------------------------
-            | Status Penggunaan Voucher
+            | Tipe Attachment
             |--------------------------------------------------------------------------
             */
 
-            // pending
-            // used
-            // cancelled
-            // refunded
-            $table->enum('status', [
-                'pending',
-                'used',
-                'cancelled',
-                'refunded',
-            ])->default('used');
+            // image
+            // video
+            // file
+            // audio
+            $table->enum('type', [
+                'image',
+                'video',
+                'file',
+                'audio',
+            ])->default('file');
 
             /*
             |--------------------------------------------------------------------------
-            | Metadata
+            | Metadata Media
             |--------------------------------------------------------------------------
             */
 
-            // IP address user
-            $table->string('ip_address')
+            // Width image/video
+            $table->unsignedInteger('width')
                 ->nullable();
 
-            // User agent browser
-            $table->text('user_agent')
+            // Height image/video
+            $table->unsignedInteger('height')
+                ->nullable();
+
+            // Duration audio/video
+            $table->unsignedInteger('duration')
                 ->nullable();
 
             /*
             |--------------------------------------------------------------------------
-            | Timestamp
+            | Flags
             |--------------------------------------------------------------------------
             */
 
-            // Waktu voucher digunakan
-            $table->timestamp('used_at')
-                ->nullable();
+            // Attachment deleted
+            $table->boolean('is_deleted')
+                ->default(false);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Soft Delete
+            |--------------------------------------------------------------------------
+            */
+
+            $table->softDeletes();
 
             $table->timestamps();
 
@@ -147,16 +133,11 @@ return new class extends Migration
             */
 
             $table->index([
-                'voucher_id',
-                'user_id',
+                'message_id',
             ]);
 
             $table->index([
-                'voucher_code',
-            ]);
-
-            $table->index([
-                'status',
+                'type',
             ]);
         });
     }
@@ -166,6 +147,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('voucher_usages');
+        Schema::dropIfExists('message_attachments');
     }
 };

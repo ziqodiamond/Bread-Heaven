@@ -36,11 +36,21 @@ class CartItem extends Model
 
     protected $fillable = [
 
-        // Relasi
+        /*
+        |--------------------------------------------------------------------------
+        | Relasi
+        |--------------------------------------------------------------------------
+        */
+
         'cart_id',
         'product_id',
 
-        // Quantity
+        /*
+        |--------------------------------------------------------------------------
+        | Quantity
+        |--------------------------------------------------------------------------
+        */
+
         'quantity',
     ];
 
@@ -88,15 +98,57 @@ class CartItem extends Model
     */
 
     /**
-     * Harga produk realtime
+     * Harga asli produk realtime
      */
-    public function getProductPriceAttribute(): int
+    public function getOriginalPriceAttribute(): int
     {
         return $this->product?->price ?? 0;
     }
 
     /**
-     * Subtotal item cart
+     * Harga final produk realtime
+     */
+    public function getProductPriceAttribute(): int
+    {
+        return $this->product?->final_price ?? 0;
+    }
+
+    /**
+     * Jumlah discount produk
+     */
+    public function getDiscountAmountAttribute(): int
+    {
+        if (!$this->product) {
+            return 0;
+        }
+
+        return $this->product->discount_amount
+            * $this->quantity;
+    }
+
+    /**
+     * Persentase discount produk
+     */
+    public function getDiscountPercentageAttribute(): int
+    {
+        return $this->product?->discount_percentage ?? 0;
+    }
+
+    /**
+     * Subtotal sebelum discount
+     */
+    public function getOriginalSubtotalAttribute(): int
+    {
+        if (!$this->product) {
+            return 0;
+        }
+
+        return $this->product->price
+            * $this->quantity;
+    }
+
+    /**
+     * Subtotal item cart setelah discount
      */
     public function getSubtotalAttribute(): int
     {
@@ -104,7 +156,8 @@ class CartItem extends Model
             return 0;
         }
 
-        return $this->product->price * $this->quantity;
+        return $this->product->final_price
+            * $this->quantity;
     }
 
     /**
@@ -116,7 +169,26 @@ class CartItem extends Model
             return 0;
         }
 
-        return $this->product->weight * $this->quantity;
+        return $this->product->weight
+            * $this->quantity;
+    }
+
+    /**
+     * Mengecek item sedang discount
+     */
+    public function getHasDiscountAttribute(): bool
+    {
+        return $this->product?->has_active_discount
+            ?? false;
+    }
+
+    /**
+     * Mengecek item flash sale
+     */
+    public function getIsFlashSaleAttribute(): bool
+    {
+        return $this->product?->is_flash_sale
+            ?? false;
     }
 
     /**
@@ -176,10 +248,24 @@ class CartItem extends Model
     /**
      * Update quantity item cart
      */
-    public function updateQuantity(int $quantity): void
-    {
+    public function updateQuantity(
+        int $quantity
+    ): void {
         $this->update([
             'quantity' => $quantity,
         ]);
+    }
+
+    /**
+     * Mengecek stok produk cukup
+     */
+    public function hasEnoughStock(): bool
+    {
+        if (!$this->product) {
+            return false;
+        }
+
+        return $this->product
+            ->hasEnoughStock($this->quantity);
     }
 }

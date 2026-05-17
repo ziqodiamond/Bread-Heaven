@@ -63,7 +63,26 @@ class OrderItem extends Model
         |--------------------------------------------------------------------------
         */
 
+        // Harga asli produk
+        'original_price',
+
+        // Harga final setelah discount
         'product_price',
+
+        // Total discount
+        'discount_amount',
+
+        // Persentase discount
+        'discount_percentage',
+
+        /*
+        |--------------------------------------------------------------------------
+        | Informasi Discount
+        |--------------------------------------------------------------------------
+        */
+
+        'discount_label',
+        'discount_source',
 
         /*
         |--------------------------------------------------------------------------
@@ -88,6 +107,10 @@ class OrderItem extends Model
         |--------------------------------------------------------------------------
         */
 
+        // Subtotal sebelum discount
+        'original_subtotal',
+
+        // Subtotal final
         'subtotal',
 
         /*
@@ -109,16 +132,41 @@ class OrderItem extends Model
     {
         return [
 
-            // Harga bigint
+            /*
+            |--------------------------------------------------------------------------
+            | Harga bigint
+            |--------------------------------------------------------------------------
+            */
+
+            'original_price' => 'integer',
+
             'product_price' => 'integer',
+
+            'discount_amount' => 'integer',
+
+            'original_subtotal' => 'integer',
+
             'subtotal' => 'integer',
 
-            // Berat
+            /*
+            |--------------------------------------------------------------------------
+            | Berat
+            |--------------------------------------------------------------------------
+            */
+
             'product_weight' => 'integer',
+
             'total_weight' => 'integer',
 
-            // Quantity
+            /*
+            |--------------------------------------------------------------------------
+            | Quantity
+            |--------------------------------------------------------------------------
+            */
+
             'quantity' => 'integer',
+
+            'discount_percentage' => 'integer',
         ];
     }
 
@@ -133,7 +181,9 @@ class OrderItem extends Model
      */
     public function order()
     {
-        return $this->belongsTo(Order::class);
+        return $this->belongsTo(
+            Order::class
+        );
     }
 
     /**
@@ -141,7 +191,9 @@ class OrderItem extends Model
      */
     public function product()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(
+            Product::class
+        );
     }
 
     /*
@@ -164,6 +216,32 @@ class OrderItem extends Model
     public function getIsCancelledAttribute(): bool
     {
         return $this->status === 'cancelled';
+    }
+
+    /**
+     * Mengecek item memiliki discount
+     */
+    public function getHasDiscountAttribute(): bool
+    {
+        return $this->discount_amount > 0;
+    }
+
+    /**
+     * Mengecek item flash sale
+     */
+    public function getIsFlashSaleAttribute(): bool
+    {
+        return $this->discount_source === 'flash_sale';
+    }
+
+    /**
+     * Total discount item
+     */
+    public function getTotalDiscountAttribute(): int
+    {
+        return
+            $this->original_subtotal -
+            $this->subtotal;
     }
 
     /*
@@ -191,6 +269,17 @@ class OrderItem extends Model
         $this->update([
 
             'status' => 'refunded',
+        ]);
+    }
+
+    /**
+     * Restore item order
+     */
+    public function restoreItem(): void
+    {
+        $this->update([
+
+            'status' => 'active',
         ]);
     }
 }

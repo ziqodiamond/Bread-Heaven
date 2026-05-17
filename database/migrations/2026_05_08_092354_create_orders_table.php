@@ -56,7 +56,8 @@ return new class extends Migration
             // Nomor invoice unik
             // Contoh:
             // INV-20260508-XXXX
-            $table->string('invoice_number')->unique();
+            $table->string('invoice_number')
+                ->unique();
 
             /*
             |--------------------------------------------------------------------------
@@ -92,7 +93,8 @@ return new class extends Migration
 
             $table->text('shipping_full_address');
 
-            $table->text('shipping_notes')->nullable();
+            $table->text('shipping_notes')
+                ->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -116,10 +118,12 @@ return new class extends Migration
             // Estimasi pengiriman
             // Contoh:
             // 2-3 days
-            $table->string('shipping_etd')->nullable();
+            $table->string('shipping_etd')
+                ->nullable();
 
             // Nomor resi manual
-            $table->string('tracking_number')->nullable();
+            $table->string('tracking_number')
+                ->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -129,20 +133,72 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            // Total harga produk
-            $table->bigInteger('subtotal')->default(0);
+            // Total harga produk sebelum discount
+            $table->bigInteger('subtotal')
+                ->default(0);
 
-            // Total ongkir
-            $table->bigInteger('shipping_cost')->default(0);
+            // Total discount produk/voucher
+            $table->bigInteger('discount_amount')
+                ->default(0);
+
+            // Discount ongkir
+            $table->bigInteger('shipping_discount')
+                ->default(0);
+
+            // Total ongkir asli
+            $table->bigInteger('shipping_cost')
+                ->default(0);
+
+            // Ongkir final setelah discount
+            $table->bigInteger('final_shipping_cost')
+                ->default(0);
 
             // Biaya admin payment
-            $table->bigInteger('service_fee')->default(0);
-
-            // Total diskon
-            $table->bigInteger('discount_amount')->default(0);
+            $table->bigInteger('service_fee')
+                ->default(0);
 
             // Total akhir pembayaran
-            $table->bigInteger('grand_total')->default(0);
+            $table->bigInteger('grand_total')
+                ->default(0);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Informasi Voucher
+            |--------------------------------------------------------------------------
+            */
+
+            // Kode voucher
+            $table->string('voucher_code')
+                ->nullable();
+
+            // Nama voucher
+            $table->string('voucher_name')
+                ->nullable();
+
+            // Jenis voucher
+            // fixed
+            // percent
+            // free_shipping
+            $table->string('voucher_type')
+                ->nullable();
+
+            // Nilai voucher
+            $table->bigInteger('voucher_value')
+                ->nullable();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Informasi Discount
+            |--------------------------------------------------------------------------
+            */
+
+            // Sumber discount
+            // voucher
+            // flash_sale
+            // product_discount
+            // admin
+            $table->string('discount_source')
+                ->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -151,7 +207,8 @@ return new class extends Migration
             */
 
             // Total berat order dalam gram
-            $table->unsignedInteger('total_weight')->default(0);
+            $table->unsignedInteger('total_weight')
+                ->default(0);
 
             /*
             |--------------------------------------------------------------------------
@@ -162,10 +219,12 @@ return new class extends Migration
             // Provider payment
             // Contoh:
             // midtrans
-            $table->string('payment_gateway')->nullable();
+            $table->string('payment_gateway')
+                ->nullable();
 
             // Reference dari payment gateway
-            $table->string('payment_reference')->nullable();
+            $table->string('payment_reference')
+                ->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -204,7 +263,8 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            $table->text('notes')->nullable();
+            $table->text('notes')
+                ->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -212,11 +272,14 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            $table->timestamp('paid_at')->nullable();
+            $table->timestamp('paid_at')
+                ->nullable();
 
-            $table->timestamp('shipped_at')->nullable();
+            $table->timestamp('shipped_at')
+                ->nullable();
 
-            $table->timestamp('completed_at')->nullable();
+            $table->timestamp('completed_at')
+                ->nullable();
 
             $table->timestamps();
         });

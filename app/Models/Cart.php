@@ -36,18 +36,61 @@ class Cart extends Model
 
     protected $fillable = [
 
-        // Relasi user
+        /*
+        |--------------------------------------------------------------------------
+        | Relasi User
+        |--------------------------------------------------------------------------
+        */
+
         'user_id',
 
-        // Status cart
+        /*
+        |--------------------------------------------------------------------------
+        | Status Cart
+        |--------------------------------------------------------------------------
+        */
+
         'status',
 
-        // Informasi cart
+        /*
+        |--------------------------------------------------------------------------
+        | Informasi Cart
+        |--------------------------------------------------------------------------
+        */
+
         'total_items',
         'total_quantity',
+
+        /*
+        |--------------------------------------------------------------------------
+        | Perhitungan Harga
+        |--------------------------------------------------------------------------
+        */
+
+        // Subtotal sebelum discount
         'subtotal',
 
-        // Expired cart
+        // Total discount
+        'discount_amount',
+
+        // Total setelah discount
+        'final_subtotal',
+
+        /*
+        |--------------------------------------------------------------------------
+        | Voucher
+        |--------------------------------------------------------------------------
+        */
+
+        'voucher_code',
+        'voucher_name',
+
+        /*
+        |--------------------------------------------------------------------------
+        | Expired Cart
+        |--------------------------------------------------------------------------
+        */
+
         'expired_at',
     ];
 
@@ -61,10 +104,22 @@ class Cart extends Model
     {
         return [
 
-            // Total harga bigint
-            'subtotal' => 'integer',
+            /*
+            |--------------------------------------------------------------------------
+            | Harga
+            |--------------------------------------------------------------------------
+            */
 
-            // Timestamp
+            'subtotal' => 'integer',
+            'discount_amount' => 'integer',
+            'final_subtotal' => 'integer',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Timestamp
+            |--------------------------------------------------------------------------
+            */
+
             'expired_at' => 'datetime',
         ];
     }
@@ -113,6 +168,14 @@ class Cart extends Model
         return $this->items->sum('quantity');
     }
 
+    /**
+     * Mengecek cart memakai voucher
+     */
+    public function getHasVoucherAttribute(): bool
+    {
+        return !empty($this->voucher_code);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Helper Methods
@@ -120,11 +183,46 @@ class Cart extends Model
     */
 
     /**
-     * Recalculate subtotal cart
+     * Refresh summary cart
      */
     public function refreshCartSummary(): void
     {
         $items = $this->items;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Hitung subtotal item
+        |--------------------------------------------------------------------------
+        */
+
+        $subtotal = $items->sum('subtotal');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Discount cart
+        |--------------------------------------------------------------------------
+        | Nanti akan dihandle oleh DiscountService
+        |--------------------------------------------------------------------------
+        */
+
+        $discountAmount = $this->discount_amount ?? 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Final subtotal
+        |--------------------------------------------------------------------------
+        */
+
+        $finalSubtotal = max(
+            0,
+            $subtotal - $discountAmount
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update cart summary
+        |--------------------------------------------------------------------------
+        */
 
         $this->update([
 
@@ -132,7 +230,25 @@ class Cart extends Model
 
             'total_quantity' => $items->sum('quantity'),
 
-            'subtotal' => $items->sum('subtotal'),
+            'subtotal' => $subtotal,
+
+            'final_subtotal' => $finalSubtotal,
         ]);
+    }
+
+    /**
+     * Hapus voucher cart
+     */
+    public function clearVoucher(): void
+    {
+        $this->update([
+
+            'voucher_code' => null,
+            'voucher_name' => null,
+
+            'discount_amount' => 0,
+        ]);
+
+        $this->refreshCartSummary();
     }
 }
