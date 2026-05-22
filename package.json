@@ -15,6 +15,7 @@
     },
     "dependencies": {
         "@tailwindcss/vite": "^4.2.4",
+        "flatpickr": "^4.6.13",
         "flowbite": "^2.5.2",
         "tailwindcss": "^4.2.4"
     }

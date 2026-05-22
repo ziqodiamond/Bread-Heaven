@@ -74,9 +74,17 @@
                         <label for="start_at" class="block text-xs font-medium text-gray-600">
                             Mulai <span class="text-red-500">*</span>
                         </label>
-                        <input type="datetime-local" name="start_at" id="start_at" value="{{ old('start_at') }}" required
-                            class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
-                                   focus:border-gray-400 focus:outline-none focus:ring-0">
+                        <div class="relative">
+                            <input type="text" name="start_at" id="start_at" data-input 
+                                value="{{ old('start_at') }}" required
+                                placeholder="Pilih tanggal dan jam mulai"
+                                class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                                       placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+                            <svg class="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" 
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </div>
                         @error('start_at')
                             <p class="text-xs text-red-600">{{ $message }}</p>
                         @enderror
@@ -86,13 +94,27 @@
                         <label for="end_at" class="block text-xs font-medium text-gray-600">
                             Berakhir <span class="text-red-500">*</span>
                         </label>
-                        <input type="datetime-local" name="end_at" id="end_at" value="{{ old('end_at') }}" required
-                            class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
-                                   focus:border-gray-400 focus:outline-none focus:ring-0">
+                        <div class="relative">
+                            <input type="text" name="end_at" id="end_at" data-input 
+                                value="{{ old('end_at') }}" required
+                                placeholder="Pilih tanggal dan jam berakhir"
+                                class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                                       placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+                            <svg class="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" 
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </div>
                         @error('end_at')
                             <p class="text-xs text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
+                </div>
+
+                <div class="px-4 py-2 bg-blue-50 rounded-lg border border-blue-100">
+                    <p class="text-xs text-blue-700">
+                        💡 Klik pada field untuk membuka kalender. Anda bisa memilih tanggal dan jam dengan mudah.
+                    </p>
                 </div>
             </div>
 
