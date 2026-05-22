@@ -31,6 +31,9 @@ Route::prefix('/')->group(function () {
     Route::get('/', [GeneralController::class, 'index'])->name('home');
     Route::get('/products', [GeneralController::class, 'products'])->name('products');
     Route::get('/product/{id}', [GeneralController::class, 'show'])->name('product.show');
+    
+    // Flash Sale API
+    Route::get('/api/flash-sales/status', [GeneralController::class, 'getFlashSalesStatus'])->name('api.flash-sales.status');
 });
 
 // WEBHOOK ROUTES (tanpa auth)

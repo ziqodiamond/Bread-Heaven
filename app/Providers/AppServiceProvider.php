@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Cart;
+use App\Helpers\ColorHelper;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -35,5 +36,12 @@ class AppServiceProvider extends ServiceProvider
 
             $view->with('cartItems', $cartItems);
         });
+
+        // Register helper function for color mapping
+        if (!function_exists('getColorRGB')) {
+            function getColorRGB($colorName, $type = 'start') {
+                return ColorHelper::getColorRGB($colorName, $type);
+            }
+        }
     }
 }
