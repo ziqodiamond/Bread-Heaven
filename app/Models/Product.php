@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Product extends Model
 {
@@ -55,13 +55,13 @@ class Product extends Model
         |--------------------------------------------------------------------------
         */
 
-        // Harga asli
+        // Harga normal produk
         'price',
 
-        // Harga diskon
+        // Harga setelah discount
         'sale_price',
 
-        // Jadwal diskon
+        // Jadwal discount produk
         'discount_start_at',
         'discount_end_at',
 
@@ -69,8 +69,14 @@ class Product extends Model
         'discount_label',
         'discount_type',
         'discount_value',
+        'discount_max',
 
-        // Stok
+        /*
+        |--------------------------------------------------------------------------
+        | Stock
+        |--------------------------------------------------------------------------
+        */
+
         'stock',
 
         /*
@@ -86,7 +92,7 @@ class Product extends Model
 
         /*
         |--------------------------------------------------------------------------
-        | Status
+        | Status Produk
         |--------------------------------------------------------------------------
         */
 
@@ -110,8 +116,12 @@ class Product extends Model
             */
 
             'price' => 'integer',
+
             'sale_price' => 'integer',
-            'discount_value' => 'integer',
+
+            'discount_value' => 'decimal:2',
+
+            'discount_max' => 'integer',
 
             /*
             |--------------------------------------------------------------------------
@@ -120,11 +130,12 @@ class Product extends Model
             */
 
             'discount_start_at' => 'datetime',
+
             'discount_end_at' => 'datetime',
 
             /*
             |--------------------------------------------------------------------------
-            | Stok
+            | Stock
             |--------------------------------------------------------------------------
             */
 
@@ -137,8 +148,11 @@ class Product extends Model
             */
 
             'weight' => 'integer',
+
             'length' => 'integer',
+
             'width' => 'integer',
+
             'height' => 'integer',
         ];
     }
@@ -151,36 +165,108 @@ class Product extends Model
 
     /**
      * Relasi item cart
+     *
+     * Cara pakai:
+     * $product->cartItems
      */
     public function cartItems()
     {
-        return $this->hasMany(CartItem::class);
+        return $this->hasMany(
+            CartItem::class
+        );
     }
 
     /**
      * Relasi item order
+     *
+     * Cara pakai:
+     * $product->orderItems
      */
     public function orderItems()
     {
-        return $this->hasMany(OrderItem::class);
+        return $this->hasMany(
+            OrderItem::class
+        );
     }
 
     /**
-     * Relasi multiple image produk
+     * Relasi multiple gambar produk
+     *
+     * Cara pakai:
+     * $product->images
      */
     public function images()
     {
-        return $this->hasMany(ProductImage::class)
-            ->orderBy('sort_order');
+        return $this->hasMany(
+            ProductImage::class
+        )->orderBy('sort_order');
     }
 
     /**
-     * Relasi thumbnail utama
+     * Relasi thumbnail utama produk
+     *
+     * Cara pakai:
+     * $product->primaryImage
      */
     public function primaryImage()
     {
-        return $this->hasOne(ProductImage::class)
-            ->where('is_primary', true);
+        return $this->hasOne(
+            ProductImage::class
+        )->where(
+            'is_primary',
+            true
+        );
+    }
+
+    /**
+     * Relasi flash sale item aktif
+     *
+     * Digunakan untuk mengambil
+     * flash sale yang sedang berjalan
+     * untuk produk ini.
+     *
+     * Cara pakai:
+     * $product->activeFlashSaleItem
+     */
+    public function activeFlashSaleItem()
+    {
+        return $this->hasOne(
+            FlashSaleItem::class
+        )
+
+            ->whereHas(
+                'flashSale',
+                function ($query) {
+
+                    $query
+
+                        ->where(
+                            'start_at',
+                            '<=',
+                            now()
+                        )
+
+                        ->where(
+                            'end_at',
+                            '>=',
+                            now()
+                        )
+
+                        ->where(
+                            'is_active',
+                            true
+                        );
+                }
+            )
+
+            ->where(
+                'is_active',
+                true
+            )
+
+            ->whereRaw(
+                'sold_quantity < stock_limit'
+            );
     }
 
     /*
@@ -191,6 +277,12 @@ class Product extends Model
 
     /**
      * Mengecek stok tersedia
+     *
+     * Return:
+     * true / false
+     *
+     * Cara pakai:
+     * $product->in_stock
      */
     public function getInStockAttribute(): bool
     {
@@ -199,6 +291,12 @@ class Product extends Model
 
     /**
      * Mengecek produk tersedia
+     *
+     * Return:
+     * true / false
+     *
+     * Cara pakai:
+     * $product->is_available
      */
     public function getIsAvailableAttribute(): bool
     {
@@ -206,16 +304,34 @@ class Product extends Model
     }
 
     /**
-     * Mengecek apakah discount aktif
+     * Mengecek apakah product discount aktif
+     *
+     * Akan mengecek:
+     * - sale_price tersedia
+     * - jadwal discount dimulai
+     * - jadwal discount belum selesai
+     *
+     * Cara pakai:
+     * $product->has_active_discount
      */
     public function getHasActiveDiscountAttribute(): bool
     {
-        // Tidak ada harga diskon
+        /*
+        |--------------------------------------------------------------------------
+        | Tidak ada harga discount
+        |--------------------------------------------------------------------------
+        */
+
         if (!$this->sale_price) {
             return false;
         }
 
-        // Jadwal mulai discount
+        /*
+        |--------------------------------------------------------------------------
+        | Discount belum dimulai
+        |--------------------------------------------------------------------------
+        */
+
         if (
             $this->discount_start_at &&
             now()->lt($this->discount_start_at)
@@ -223,7 +339,12 @@ class Product extends Model
             return false;
         }
 
-        // Jadwal selesai discount
+        /*
+        |--------------------------------------------------------------------------
+        | Discount sudah selesai
+        |--------------------------------------------------------------------------
+        */
+
         if (
             $this->discount_end_at &&
             now()->gt($this->discount_end_at)
@@ -236,6 +357,13 @@ class Product extends Model
 
     /**
      * Harga final produk
+     *
+     * Prioritas:
+     * - Harga discount
+     * - Harga normal
+     *
+     * Cara pakai:
+     * $product->final_price
      */
     public function getFinalPriceAttribute(): int
     {
@@ -247,7 +375,13 @@ class Product extends Model
     }
 
     /**
-     * Jumlah discount produk
+     * Total potongan discount produk
+     *
+     * Contoh:
+     * 100000 - 80000 = 20000
+     *
+     * Cara pakai:
+     * $product->discount_amount
      */
     public function getDiscountAmountAttribute(): int
     {
@@ -255,11 +389,19 @@ class Product extends Model
             return 0;
         }
 
-        return $this->price - $this->sale_price;
+        return
+            $this->price -
+            $this->sale_price;
     }
 
     /**
      * Persentase discount produk
+     *
+     * Contoh:
+     * 20 (%)
+     *
+     * Cara pakai:
+     * $product->discount_percentage
      */
     public function getDiscountPercentageAttribute(): int
     {
@@ -272,48 +414,143 @@ class Product extends Model
 
         return (int) round(
             (
-                $this->discount_amount / $this->price
+                $this->discount_amount /
+                $this->price
             ) * 100
         );
     }
 
     /**
-     * Mengecek produk flash sale
+     * Mengecek produk sedang flash sale
+     *
+     * Cara pakai:
+     * $product->is_flash_sale
      */
     public function getIsFlashSaleAttribute(): bool
     {
         return
-            $this->has_active_discount &&
-            str_contains(
-                strtolower($this->discount_label ?? ''),
-                'flash'
-            );
-    }
-
-    /**
-     * URL thumbnail default
-     */
-    public function getImageAttribute(): string
-    {
-        return $this->image_url
-            ? asset('storage/' . $this->image_url)
-            : asset('images/no-image.png');
+            $this->activeFlashSaleItem !== null;
     }
 
     /**
      * Thumbnail utama produk
+     *
+     * Fallback ke gambar default
+     * jika thumbnail utama kosong.
+     *
+     * Cara pakai:
+     * $product->thumbnail
      */
     public function getThumbnailAttribute(): string
     {
-        $primaryImage = $this->primaryImage;
+        $primaryImage =
+            $this->primaryImage;
 
         if ($primaryImage) {
+
             return asset(
-                'storage/' . $primaryImage->image_url
+
+                'storage/' .
+
+                    $primaryImage->image_url
             );
         }
 
-        return asset('images/no-image.png');
+        return asset(
+            'images/no-image.png'
+        );
+    }
+
+    /**
+     * Harga produk yang sudah resolve otomatis
+     *
+     * Prioritas harga:
+     * 1. Flash Sale
+     * 2. Product Discount
+     * 3. Harga Normal
+     *
+     * Cara pakai:
+     * $product->resolved_price
+     */
+    public function getResolvedPriceAttribute(): int
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Prioritas Flash Sale
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->activeFlashSaleItem) {
+
+            return $this
+
+                ->activeFlashSaleItem
+
+                ->sale_price;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Product Discount
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->has_active_discount) {
+
+            return $this->sale_price;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Harga Normal
+        |--------------------------------------------------------------------------
+        */
+
+        return $this->price;
+    }
+
+    /**
+     * Tipe discount aktif
+     *
+     * Berguna untuk badge UI frontend.
+     *
+     * Return:
+     * - flash_sale
+     * - product_discount
+     * - none
+     *
+     * Cara pakai:
+     * $product->active_discount_type
+     */
+    public function getActiveDiscountTypeAttribute(): string
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Flash Sale
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->activeFlashSaleItem) {
+            return 'flash_sale';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Product Discount
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->has_active_discount) {
+            return 'product_discount';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Tidak ada discount
+        |--------------------------------------------------------------------------
+        */
+
+        return 'none';
     }
 
     /*
@@ -324,6 +561,9 @@ class Product extends Model
 
     /**
      * Produk available
+     *
+     * Cara pakai:
+     * Product::available()->get();
      */
     public function scopeAvailable($query)
     {
@@ -334,7 +574,10 @@ class Product extends Model
     }
 
     /**
-     * Produk masih ada stok
+     * Produk masih memiliki stok
+     *
+     * Cara pakai:
+     * Product::inStock()->get();
      */
     public function scopeInStock($query)
     {
@@ -346,7 +589,10 @@ class Product extends Model
     }
 
     /**
-     * Filter kategori
+     * Filter berdasarkan kategori
+     *
+     * Cara pakai:
+     * Product::category('makanan')->get();
      */
     public function scopeCategory(
         $query,
@@ -360,18 +606,25 @@ class Product extends Model
 
     /**
      * Produk yang sedang discount
+     *
+     * Cara pakai:
+     * Product::discountActive()->get();
      */
     public function scopeDiscountActive($query)
     {
         return $query
 
-            ->whereNotNull('sale_price')
+            ->whereNotNull(
+                'sale_price'
+            )
 
             ->where(function ($query) {
 
                 $query
 
-                    ->whereNull('discount_start_at')
+                    ->whereNull(
+                        'discount_start_at'
+                    )
 
                     ->orWhere(
                         'discount_start_at',
@@ -384,7 +637,9 @@ class Product extends Model
 
                 $query
 
-                    ->whereNull('discount_end_at')
+                    ->whereNull(
+                        'discount_end_at'
+                    )
 
                     ->orWhere(
                         'discount_end_at',
@@ -402,6 +657,9 @@ class Product extends Model
 
     /**
      * Mengurangi stok produk
+     *
+     * Contoh:
+     * $product->decreaseStock(2);
      */
     public function decreaseStock(
         int $quantity
@@ -414,6 +672,9 @@ class Product extends Model
 
     /**
      * Menambah stok produk
+     *
+     * Contoh:
+     * $product->increaseStock(5);
      */
     public function increaseStock(
         int $quantity
@@ -425,11 +686,16 @@ class Product extends Model
     }
 
     /**
-     * Mengecek apakah stok cukup
+     * Mengecek stok produk cukup
+     *
+     * Contoh:
+     * $product->hasEnoughStock(3);
      */
     public function hasEnoughStock(
         int $quantity
     ): bool {
-        return $this->stock >= $quantity;
+        return
+            $this->stock >=
+            $quantity;
     }
 }

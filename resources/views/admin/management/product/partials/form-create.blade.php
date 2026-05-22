@@ -37,25 +37,25 @@
 
     {{-- ── Harga + Stok ─────────────────────────────────────────────── --}}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="space-y-1.5">
-            <label for="create_price" class="block text-xs font-medium text-gray-600">
-                Harga <span class="text-red-500">*</span>
-            </label>
-            <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
-                <input type="number" name="price" id="create_price" min="0" placeholder="0" required
-                    class="w-full rounded-xl border border-gray-200 pl-10 pr-3 py-2.5 text-sm text-gray-700
-                           placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
-            </div>
-        </div>
-        <div class="space-y-1.5">
-            <label for="create_stock" class="block text-xs font-medium text-gray-600">
-                Stok <span class="text-red-500">*</span>
-            </label>
-            <input type="number" name="stock" id="create_stock" min="0" placeholder="0" required
-                class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
-                       placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
-        </div>
+       <div class="space-y-1.5">
+           <label for="create_price" class="block text-xs font-medium text-gray-600">
+               Harga <span class="text-red-500">*</span>
+           </label>
+           <div class="relative">
+               <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
+               <input type="number" name="price" id="create_price" min="0" placeholder="0" required
+                   class="w-full rounded-xl border border-gray-200 pl-10 pr-3 py-2.5 text-sm text-gray-700
+                          placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+           </div>
+       </div>
+       <div class="space-y-1.5">
+           <label for="create_stock" class="block text-xs font-medium text-gray-600">
+               Stok <span class="text-red-500">*</span>
+           </label>
+           <input type="number" name="stock" id="create_stock" min="0" placeholder="0" required
+               class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                      placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+       </div>
     </div>
 
     {{-- ── Berat + Dimensi ──────────────────────────────────────────── --}}
@@ -97,6 +97,112 @@
             <option value="available">Available</option>
             <option value="not_available">Not Available</option>
         </select>
+    </div>
+
+    {{-- ══════════════════════════════════════════════════════════════
+         DISKON PRODUK - SIMPLE CALCULATOR
+    ══════════════════════════════════════════════════════════════ --}}
+    <div class="border-t pt-4">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-sm font-medium text-gray-900">Diskon Produk</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Masukkan diskon atau harga jual</p>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="enable_discount" value="1"
+                    class="h-4 w-4 rounded border-gray-300">
+                <span class="text-xs font-medium text-gray-600">Aktifkan</span>
+            </label>
+        </div>
+
+        <div x-data="discountCalc({
+            priceId: 'create_price',
+            salePriceId: 'create_sale_price',
+            discountTypeId: 'create_discount_type',
+            discountValueId: 'create_discount_value',
+            discountInfoId: 'create_discount_info'
+        })"
+        class="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 py-3 bg-gray-50 rounded-xl">
+            
+            {{-- Tipe Diskon --}}
+            <div class="space-y-1.5">
+                <label for="create_discount_type" class="block text-xs font-medium text-gray-600">
+                    Tipe Diskon
+                </label>
+                <select id="create_discount_type" name="discount_type"
+                    @change="updateType($event)"
+                    class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                           focus:border-gray-400 focus:outline-none focus:ring-0">
+                    <option value="">-- Pilih Tipe --</option>
+                    <option value="percent">Persen (%)</option>
+                    <option value="fixed">Potongan Harga (Rp)</option>
+                </select>
+            </div>
+
+            {{-- Nilai Diskon --}}
+            <div class="space-y-1.5">
+                <label for="create_discount_value" class="block text-xs font-medium text-gray-600">
+                    Nilai Diskon <span class="text-gray-400" x-text="discountType === 'percent' ? '(%)' : '(Rp)'"></span>
+                </label>
+                <input type="number" id="create_discount_value" name="discount_value"
+                    @input="updateFromDiscount($event)" min="0" step="0.01"
+                    placeholder="Input nilai diskon"
+                    class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                           focus:border-gray-400 focus:outline-none focus:ring-0">
+                <p class="text-xs text-gray-500 mt-1" x-show="msg" x-text="msg"></p>
+            </div>
+
+            {{-- Harga Jual --}}
+            <div class="space-y-1.5 md:col-span-2">
+                <label for="create_sale_price" class="block text-xs font-medium text-gray-600">
+                    Harga Jual (Rp)
+                </label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
+                    <input type="number" id="create_sale_price" name="sale_price"
+                        @input="updateFromSalePrice($event)" min="0"
+                        class="w-full rounded-xl border border-gray-200 pl-10 pr-3 py-2.5 text-sm text-gray-700
+                               focus:border-gray-400 focus:outline-none focus:ring-0">
+                </div>
+            </div>
+
+            {{-- Info Message --}}
+            <div id="create_discount_info" class="md:col-span-2 text-xs text-gray-600 p-2 bg-blue-50 rounded-lg" x-show="infoMsg" x-text="infoMsg"></div>
+
+            {{-- Label Diskon --}}
+            <div class="space-y-1.5 md:col-span-2">
+                <label for="create_discount_label" class="block text-xs font-medium text-gray-600">
+                    Label Diskon (Promo, Flash Sale, dll)
+                </label>
+                <input type="text" name="discount_label" id="create_discount_label"
+                    placeholder="Contoh: Promo Spesial"
+                    class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                           focus:border-gray-400 focus:outline-none focus:ring-0">
+            </div>
+        </div>
+
+        {{-- Jadwal Diskon --}}
+        <div class="mt-3">
+            <p class="text-xs font-medium text-gray-600 mb-2">Jadwal Diskon (Opsional)</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                    <label for="create_discount_start" class="block text-xs font-medium text-gray-600">
+                        Mulai Diskon
+                    </label>
+                    <input type="datetime-local" name="discount_start_at" id="create_discount_start"
+                        class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                               focus:border-gray-400 focus:outline-none focus:ring-0">
+                </div>
+                <div class="space-y-1.5">
+                    <label for="create_discount_end" class="block text-xs font-medium text-gray-600">
+                        Akhir Diskon
+                    </label>
+                    <input type="datetime-local" name="discount_end_at" id="create_discount_end"
+                        class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                               focus:border-gray-400 focus:outline-none focus:ring-0">
+                </div>
+            </div>
+        </div>
     </div>
 
     {{-- ══════════════════════════════════════════════════════════════

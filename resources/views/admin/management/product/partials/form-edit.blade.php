@@ -128,6 +128,122 @@
     </div>
 
     {{-- ══════════════════════════════════════════════════════════════
+         DISKON PRODUK - SIMPLE CALCULATOR
+    ══════════════════════════════════════════════════════════════ --}}
+    <div class="border-t pt-4">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-sm font-medium text-gray-900">Diskon Produk</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Masukkan diskon atau harga jual</p>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="enable_discount" value="1" 
+                    {{ old('enable_discount', $product->sale_price ? true : false) ? 'checked' : '' }}
+                    class="h-4 w-4 rounded border-gray-300">
+                <span class="text-xs font-medium text-gray-600">Aktifkan</span>
+            </label>
+        </div>
+
+        <div x-data="discountCalc({
+            priceId: 'edit_price_{{ $product->id }}',
+            salePriceId: 'edit_sale_price_{{ $product->id }}',
+            discountTypeId: 'edit_discount_type_{{ $product->id }}',
+            discountValueId: 'edit_discount_value_{{ $product->id }}',
+            discountInfoId: 'edit_discount_info_{{ $product->id }}',
+            initialPrice: {{ $product->price }},
+            initialSalePrice: {{ $product->sale_price ?? 'null' }},
+            initialType: '{{ $product->discount_type ?? '' }}',
+            initialValue: {{ $product->discount_value ?? 'null' }}
+        })"
+        class="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 py-3 bg-gray-50 rounded-xl">
+            
+            {{-- Tipe Diskon --}}
+            <div class="space-y-1.5">
+                <label for="edit_discount_type_{{ $product->id }}" class="block text-xs font-medium text-gray-600">
+                    Tipe Diskon
+                </label>
+                <select id="edit_discount_type_{{ $product->id }}" name="discount_type"
+                    @change="updateType($event)"
+                    class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                           focus:border-gray-400 focus:outline-none focus:ring-0">
+                    <option value="">-- Pilih Tipe --</option>
+                    <option value="percent">Persen (%)</option>
+                    <option value="fixed">Potongan Harga (Rp)</option>
+                </select>
+            </div>
+
+            {{-- Nilai Diskon --}}
+            <div class="space-y-1.5">
+                <label for="edit_discount_value_{{ $product->id }}" class="block text-xs font-medium text-gray-600">
+                    Nilai Diskon <span class="text-gray-400" x-text="discountType === 'percent' ? '(%)' : '(Rp)'"></span>
+                </label>
+                <input type="number" id="edit_discount_value_{{ $product->id }}" name="discount_value"
+                    value="{{ old('discount_value', $product->discount_value) }}"
+                    @input="updateFromDiscount($event)" min="0" step="0.01"
+                    placeholder="Input nilai diskon"
+                    class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                           focus:border-gray-400 focus:outline-none focus:ring-0">
+                <p class="text-xs text-gray-500 mt-1" x-show="msg" x-text="msg"></p>
+            </div>
+
+            {{-- Harga Jual --}}
+            <div class="space-y-1.5 md:col-span-2">
+                <label for="edit_sale_price_{{ $product->id }}" class="block text-xs font-medium text-gray-600">
+                    Harga Jual (Rp)
+                </label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
+                    <input type="number" id="edit_sale_price_{{ $product->id }}" name="sale_price"
+                        value="{{ old('sale_price', $product->sale_price) }}"
+                        @input="updateFromSalePrice($event)" min="0"
+                        class="w-full rounded-xl border border-gray-200 pl-10 pr-3 py-2.5 text-sm text-gray-700
+                               focus:border-gray-400 focus:outline-none focus:ring-0">
+                </div>
+            </div>
+
+            {{-- Info Message --}}
+            <div id="edit_discount_info_{{ $product->id }}" class="md:col-span-2 text-xs text-gray-600 p-2 bg-blue-50 rounded-lg" x-show="infoMsg" x-text="infoMsg"></div>
+
+            {{-- Label Diskon --}}
+            <div class="space-y-1.5 md:col-span-2">
+                <label for="edit_discount_label_{{ $product->id }}" class="block text-xs font-medium text-gray-600">
+                    Label Diskon (Promo, Flash Sale, dll)
+                </label>
+                <input type="text" name="discount_label" id="edit_discount_label_{{ $product->id }}"
+                    value="{{ old('discount_label', $product->discount_label) }}"
+                    placeholder="Contoh: Promo Spesial"
+                    class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                           focus:border-gray-400 focus:outline-none focus:ring-0">
+            </div>
+        </div>
+
+        {{-- Jadwal Diskon --}}
+        <div class="mt-3">
+            <p class="text-xs font-medium text-gray-600 mb-2">Jadwal Diskon (Opsional)</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                    <label for="edit_discount_start_{{ $product->id }}" class="block text-xs font-medium text-gray-600">
+                        Mulai Diskon
+                    </label>
+                    <input type="datetime-local" name="discount_start_at" id="edit_discount_start_{{ $product->id }}"
+                        value="{{ old('discount_start_at', $product->discount_start_at?->format('Y-m-d\TH:i')) }}"
+                        class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                               focus:border-gray-400 focus:outline-none focus:ring-0">
+                </div>
+                <div class="space-y-1.5">
+                    <label for="edit_discount_end_{{ $product->id }}" class="block text-xs font-medium text-gray-600">
+                        Akhir Diskon
+                    </label>
+                    <input type="datetime-local" name="discount_end_at" id="edit_discount_end_{{ $product->id }}"
+                        value="{{ old('discount_end_at', $product->discount_end_at?->format('Y-m-d\TH:i')) }}"
+                        class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                               focus:border-gray-400 focus:outline-none focus:ring-0">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ══════════════════════════════════════════════════════════════
          FOTO PRODUK
     ══════════════════════════════════════════════════════════════ --}}
     <div class="space-y-2">

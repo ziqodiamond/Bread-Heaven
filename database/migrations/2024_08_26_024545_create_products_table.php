@@ -100,7 +100,7 @@ return new class extends Migration
             // Contoh:
             // 10 = 10%
             // 5000 = Rp5.000
-            $table->bigInteger('discount_value')
+            $table->decimal('discount_value', 10, 2)
                 ->nullable();
 
             // Stok produk

@@ -117,6 +117,42 @@
                     Products
                 </a>
 
+                <a href="{{ route('admin.management.discounts.index') }}" @click="open = false"
+                    class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500
+                           hover:bg-gray-50 hover:text-gray-800
+                           {{ request()->routeIs('admin.management.discounts.*') ? 'bg-gray-50 text-gray-900 font-medium' : '' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M12 8c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3zm0 2c-2.761 0-5 2.239-5 5s2.239 5 5 5 5-2.239 5-5-2.239-5-5-5z" />
+                    </svg>
+                    Discounts
+                </a>
+
+                <a href="{{ route('admin.management.flash_sales.index') }}" @click="open = false"
+                    class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500
+                           hover:bg-gray-50 hover:text-gray-800
+                           {{ request()->routeIs('admin.management.flash_sales.*') ? 'bg-gray-50 text-gray-900 font-medium' : '' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Flash Sales
+                </a>
+
+                <a href="{{ route('admin.management.vouchers.index') }}" @click="open = false"
+                    class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500
+                           hover:bg-gray-50 hover:text-gray-800
+                           {{ request()->routeIs('admin.management.vouchers.*') ? 'bg-gray-50 text-gray-900 font-medium' : '' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    Vouchers
+                </a>
+
                 <a href="{{ route('admin.management.stores.index') }}" @click="open = false"
                     class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500
                            hover:bg-gray-50 hover:text-gray-800

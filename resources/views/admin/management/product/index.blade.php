@@ -305,57 +305,57 @@
                     return this.deleteRouteBase + this.deleteId;
                 },
 
-                /*
-                |──────────────────────────────────────────────────────────
-                | State form CREATE
-                |──────────────────────────────────────────────────────────
-                */
-                createImages: [],
-                primaryIndex: 0,
+               /*
+               |──────────────────────────────────────────────────────────
+               | State form CREATE
+               |──────────────────────────────────────────────────────────
+               */
+               createImages: [],
+               primaryIndex: 0,
 
-                /*
-                |──────────────────────────────────────────────────────────
-                | State form EDIT
-                | Disimpan per produk ID agar tidak konflik antar produk
-                |──────────────────────────────────────────────────────────
-                | imgState[productId] = {
-                |   existingImages    : [{id, url, alt, isPrimary}]
-                |   primaryExistingId : string|null   — ID existing image yang jadi primary
-                |   deletedIds        : string[]      — ID existing image yang dihapus
-                |   newImages         : [{name, url, file}]
-                |   primaryNewIndex   : number        — index di newImages yang jadi primary (-1 = none)
-                | }
-                */
-                imgState: @js(
+               /*
+               |──────────────────────────────────────────────────────────
+               | State form EDIT
+               | Disimpan per produk ID agar tidak konflik antar produk
+               |──────────────────────────────────────────────────────────
+               | imgState[productId] = {
+               |   existingImages    : [{id, url, alt, isPrimary}]
+               |   primaryExistingId : string|null   — ID existing image yang jadi primary
+               |   deletedIds        : string[]      — ID existing image yang dihapus
+               |   newImages         : [{name, url, file}]
+               |   primaryNewIndex   : number        — index di newImages yang jadi primary (-1 = none)
+               | }
+               */
+               imgState: @js(
     $products->mapWithKeys(function ($p) {
         $primaryImg = $p->images->firstWhere('is_primary', true);
         return [
-            $p->id => [
+           $p->id => [
                 // Pakai accessor $img->image dari model ProductImage
-                'existingImages' => $p->images
-                    ->map(
-                        fn($img) => [
-                            'id' => $img->id,
-                            'url' => $img->image,
+               'existingImages' => $p->images
+                   ->map(
+                       fn($img) => [
+                           'id' => $img->id,
+                           'url' => $img->image,
                             'alt' => $img->alt_text ?? $p->name,
-                            'isPrimary' => (bool) $img->is_primary,
-                        ],
-                    )
-                    ->values(),
-                'primaryExistingId' => optional($primaryImg)->id,
+                           'isPrimary' => (bool) $img->is_primary,
+                       ],
+                   )
+                   ->values(),
+               'primaryExistingId' => optional($primaryImg)->id,
                 'deletedIds' => [],
-                'newImages' => [],
-                'primaryNewIndex' => -1,
-            ],
+               'newImages' => [],
+               'primaryNewIndex' => -1,
+           ],
         ];
     }),
 ),
 
-                /*
-                |──────────────────────────────────────────────────────────
-                | Computed getters
-                |──────────────────────────────────────────────────────────
-                */
+               /*
+               |──────────────────────────────────────────────────────────
+               | Computed getters
+               |──────────────────────────────────────────────────────────
+               */
 
                 // Shortcut state produk yang sedang di-edit
                 get img() {
@@ -540,6 +540,148 @@
                     }
                 },
 
+            };
+        }
+
+        /**
+         * discountCalc — Inline Alpine.js component untuk setiap form discount
+         * SIMPLE: Hanya 3 field (discount type, discount value, sale price) + auto-calc
+         * State: Form-scoped, bukan global. Setiap form punya instance sendiri.
+         */
+        function discountCalc(config) {
+            return {
+                // Config dari template
+                priceId: config.priceId,
+                salePriceId: config.salePriceId,
+                discountTypeId: config.discountTypeId,
+                discountValueId: config.discountValueId,
+                discountInfoId: config.discountInfoId,
+                
+                // State
+                discountType: config.initialType || '',
+                discountValue: config.initialValue || null,
+                salePrice: config.initialSalePrice || null,
+                msg: '',
+                infoMsg: '',
+
+                // Helper untuk dapat nilai harga dari field (create/edit)
+                getPrice() {
+                    const priceInput = document.getElementById(this.priceId);
+                    return priceInput ? parseInt(priceInput.value) || 0 : 0;
+                },
+
+                // Helper untuk set harga jual ke field
+                setSalePrice(value) {
+                    const field = document.getElementById(this.salePriceId);
+                    if (field) field.value = value > 0 ? Math.floor(value) : '';
+                },
+
+                // Hitung harga jual dari diskon (user input discount → auto-calc sale price)
+                updateFromDiscount(event) {
+                    this.discountValue = event.target.value ? parseInt(event.target.value) : null;
+                    
+                    if (!this.discountType) {
+                        this.msg = 'Pilih tipe diskon dulu';
+                        this.setSalePrice(0);
+                        return;
+                    }
+
+                    if (!this.discountValue || this.discountValue < 0) {
+                        this.msg = '';
+                        this.setSalePrice(0);
+                        return;
+                    }
+
+                    const price = this.getPrice();
+                    if (price <= 0) {
+                        this.msg = 'Atur harga produk dulu';
+                        this.setSalePrice(0);
+                        return;
+                    }
+
+                    let calculated = 0;
+                    if (this.discountType === 'percent') {
+                        calculated = price * (1 - this.discountValue / 100);
+                    } else if (this.discountType === 'fixed') {
+                        calculated = price - this.discountValue;
+                    }
+
+                    calculated = Math.floor(calculated);
+                    
+                    if (calculated < 0) {
+                        this.msg = 'Diskon terlalu besar';
+                        this.setSalePrice(0);
+                        return;
+                    }
+
+                    this.msg = `Harga jual: Rp ${calculated.toLocaleString('id-ID')}`;
+                    this.setSalePrice(calculated);
+                    this.salePrice = calculated;
+                    this.updateInfoMsg();
+                },
+
+                // Hitung diskon dari harga jual (user input sale price → auto-calc discount)
+                updateFromSalePrice(event) {
+                    this.salePrice = event.target.value ? parseInt(event.target.value) : null;
+                    
+                    const price = this.getPrice();
+                    if (price <= 0) {
+                        this.infoMsg = 'Atur harga produk dulu';
+                        return;
+                    }
+
+                    if (!this.salePrice || this.salePrice < 0) {
+                        this.infoMsg = '';
+                        this.discountValue = null;
+                        this.discountType = '';
+                        document.getElementById(this.discountTypeId).value = '';
+                        document.getElementById(this.discountValueId).value = '';
+                        return;
+                    }
+
+                    if (this.salePrice >= price) {
+                        this.infoMsg = 'Harga jual harus lebih kecil dari harga normal';
+                        this.discountValue = null;
+                        this.discountType = '';
+                        document.getElementById(this.discountTypeId).value = '';
+                        document.getElementById(this.discountValueId).value = '';
+                        return;
+                    }
+
+                    // Hitung diskon persen (default ke persen)
+                    const discountPercent = ((price - this.salePrice) / price) * 100;
+                    
+                    this.discountType = 'percent';
+                    this.discountValue = Math.round(discountPercent * 100) / 100;
+                    
+                    document.getElementById(this.discountTypeId).value = 'percent';
+                    document.getElementById(this.discountValueId).value = this.discountValue;
+
+                    this.infoMsg = `Diskon ${this.discountValue}%`;
+                    this.msg = '';
+                },
+
+                // Update pesan info
+                updateInfoMsg() {
+                    const price = this.getPrice();
+                    if (this.salePrice && this.salePrice < price) {
+                        const savedAmount = price - this.salePrice;
+                        this.infoMsg = `Hemat: Rp ${savedAmount.toLocaleString('id-ID')}`;
+                    } else {
+                        this.infoMsg = '';
+                    }
+                },
+
+                // Saat tipe diskon berubah
+                updateType(event) {
+                    this.discountType = event.target.value;
+                    if (!this.discountType) {
+                        this.msg = '';
+                        this.setSalePrice(0);
+                        this.discountValue = null;
+                    }
+                    document.getElementById(this.discountValueId).value = '';
+                }
             };
         }
     </script>

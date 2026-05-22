@@ -5,6 +5,9 @@ use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminPaymentController;
 use App\Http\Controllers\Admin\AdminShipmentController;
 use App\Http\Controllers\Admin\StoreController;
+use App\Http\Controllers\Admin\DiscountController;
+use App\Http\Controllers\Admin\FlashSaleController;
+use App\Http\Controllers\Admin\VoucherController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
@@ -102,6 +105,38 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:ad
             Route::get('/{product}/edit', [ProductController::class, 'edit'])->name('edit');
             Route::put('/{product}', [ProductController::class, 'update'])->name('update');
             Route::delete('/{product}', [ProductController::class, 'destroy'])->name('destroy');
+        });
+
+        // Discount Management
+        Route::prefix('discounts')->name('discounts.')->group(function () {
+            Route::get('/', [DiscountController::class, 'index'])->name('index');
+            Route::get('/{product}/edit', [DiscountController::class, 'edit'])->name('edit');
+            Route::put('/{product}', [DiscountController::class, 'update'])->name('update');
+            Route::delete('/{product}', [DiscountController::class, 'destroy'])->name('destroy');
+            Route::post('/bulk', [DiscountController::class, 'bulkToggle'])->name('bulk');
+        });
+
+        // Flash Sale Management
+        Route::prefix('flash-sales')->name('flash_sales.')->group(function () {
+            Route::get('/', [FlashSaleController::class, 'index'])->name('index');
+            Route::get('/create', [FlashSaleController::class, 'create'])->name('create');
+            Route::post('/', [FlashSaleController::class, 'store'])->name('store');
+            Route::get('/{flashSale}/edit', [FlashSaleController::class, 'edit'])->name('edit');
+            Route::put('/{flashSale}', [FlashSaleController::class, 'update'])->name('update');
+            Route::delete('/{flashSale}', [FlashSaleController::class, 'destroy'])->name('destroy');
+            Route::post('/{flashSale}/items', [FlashSaleController::class, 'addItem'])->name('addItem');
+            Route::delete('/items/{flashSaleItem}', [FlashSaleController::class, 'removeItem'])->name('removeItem');
+        });
+
+        // Voucher Management
+        Route::prefix('vouchers')->name('vouchers.')->group(function () {
+            Route::get('/', [VoucherController::class, 'index'])->name('index');
+            Route::get('/create', [VoucherController::class, 'create'])->name('create');
+            Route::post('/', [VoucherController::class, 'store'])->name('store');
+            Route::get('/{voucher}/edit', [VoucherController::class, 'edit'])->name('edit');
+            Route::put('/{voucher}', [VoucherController::class, 'update'])->name('update');
+            Route::delete('/{voucher}', [VoucherController::class, 'destroy'])->name('destroy');
+            Route::post('/generate-code', [VoucherController::class, 'generateCode'])->name('generateCode');
         });
 
         Route::prefix('users')->name('users.')->group(function () {

@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\ProductImage;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
-use App\Models\ProductImage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -13,288 +13,992 @@ class ProductController extends Controller
 {
     /*
     |--------------------------------------------------------------------------
-    | INDEX
+    | Display Listing
     |--------------------------------------------------------------------------
     */
 
-    public function index(Request $request)
+    public function index()
     {
-        $categories = Product::select('category')->distinct()->pluck('category');
-        $statuses   = Product::select('status')->distinct()->pluck('status');
+        $products = Product::with([
+            'images',
+            'primaryImage',
+        ])
 
-        $query = Product::with('images'); // eager load semua images sekaligus
+            ->latest()
 
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
-        }
+            ->paginate(10);
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        $products = $query->latest()->get();
-
-        return view('admin.management.product.index', compact(
-            'products',
-            'categories',
-            'statuses',
-        ));
+        return view(
+            'admin.management.product.index',
+            compact('products')
+        );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | STORE
+    | Show Create Form
+    |--------------------------------------------------------------------------
+    */
+
+    public function create()
+    {
+        return view('admin.management.product.create');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Store Product
     |--------------------------------------------------------------------------
     */
 
     public function store(Request $request)
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Validasi
+        |--------------------------------------------------------------------------
+        */
+
         $request->validate([
-            'name'                => 'required|string|max:255',
-            'category'            => 'required|string|max:255',
-            'description'         => 'required|string',
-            'price'               => 'required|integer|min:0',
-            'stock'               => 'required|integer|min:0',
-            'weight'              => 'required|integer|min:0',
-            'length'              => 'nullable|integer|min:0',
-            'width'               => 'nullable|integer|min:0',
-            'height'              => 'nullable|integer|min:0',
-            'status'              => 'required|in:available,not_available',
-            'images'              => 'required|array|min:1',
-            'images.*'            => 'image|mimes:jpg,jpeg,png,webp|max:2048',
-            'primary_image_index' => 'nullable|integer|min:0',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Informasi Produk
+            |--------------------------------------------------------------------------
+            */
+
+            'name' => 'required|string|max:255',
+
+            'category' => 'nullable|string|max:255',
+
+            'description' => 'nullable|string',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Harga
+            |--------------------------------------------------------------------------
+            */
+
+            'price' => 'required|integer|min:0',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Discount
+            |--------------------------------------------------------------------------
+            */
+
+            'discount_label' => 'nullable|string|max:255',
+
+            'discount_type' => 'nullable|in:fixed,percent',
+
+            'discount_value' => 'nullable|numeric|min:0',
+
+            'discount_start_at' => 'nullable|date',
+
+            'discount_end_at' => 'nullable|date|after_or_equal:discount_start_at',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Stock
+            |--------------------------------------------------------------------------
+            */
+
+            'stock' => 'required|integer|min:0',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Shipping
+            |--------------------------------------------------------------------------
+            */
+
+            'weight' => 'required|integer|min:0',
+
+            'length' => 'nullable|integer|min:0',
+
+            'width' => 'nullable|integer|min:0',
+
+            'height' => 'nullable|integer|min:0',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Status
+            |--------------------------------------------------------------------------
+            */
+
+            'status' => 'required|in:available,draft,archived',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Images
+            |--------------------------------------------------------------------------
+            */
+
+            'images.*' => 'nullable|image|max:5120',
         ]);
 
-        $files        = $request->file('images');
-        $primaryIndex = (int) $request->input('primary_image_index', 0);
-        $primaryIndex = min($primaryIndex, count($files) - 1); // clamp agar tidak out of bounds
+        /*
+        |--------------------------------------------------------------------------
+        | Validasi bisnis discount
+        |--------------------------------------------------------------------------
+        */
 
-        DB::transaction(function () use ($request, $files, $primaryIndex) {
+        if (
+            $request->filled('discount_type') &&
+            !$request->filled('discount_value')
+        ) {
 
-            $product = Product::create([
-                'name'        => $request->name,
-                'slug'        => Str::slug($request->name) . '-' . Str::random(5),
-                'sku'         => 'SKU-' . strtoupper(Str::random(10)),
-                'category'    => $request->category,
-                'description' => $request->description,
-                'price'       => $request->price,
-                'stock'       => $request->stock,
-                'weight'      => $request->weight,
-                'length'      => $request->length ?? 0,
-                'width'       => $request->width ?? 0,
-                'height'      => $request->height ?? 0,
-                'status'      => $request->status,
-            ]);
+            return back()
 
-            foreach ($files as $index => $image) {
-                $path = $image->store('product_images', 'public');
+                ->withErrors([
+                    'discount_value' =>
+                    'Nilai diskon wajib diisi.',
+                ])
 
-                ProductImage::create([
-                    'product_id' => $product->id,
-                    'image_url'  => $path,
-                    'alt_text'   => $product->name,
-                    'sort_order' => $index + 1,
-                    'is_primary' => $index === $primaryIndex,
-                    'is_active'  => true,
-                ]);
+                ->withInput();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Discount percent maksimal 100
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->discount_type === 'percent' &&
+            $request->discount_value > 100
+        ) {
+
+            return back()
+
+                ->withErrors([
+                    'discount_value' =>
+                    'Diskon persen maksimal 100%.',
+                ])
+
+                ->withInput();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Discount fixed tidak boleh melebihi harga
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->discount_type === 'fixed' &&
+            $request->discount_value >= $request->price
+        ) {
+
+            return back()
+
+                ->withErrors([
+                    'discount_value' =>
+                    'Diskon nominal tidak boleh melebihi harga produk.',
+                ])
+
+                ->withInput();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Enable discount
+        |--------------------------------------------------------------------------
+        */
+
+        $discountEnabled =
+            $request->boolean('enable_discount');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Hitung sale price otomatis
+        |--------------------------------------------------------------------------
+        */
+
+        $salePrice = null;
+
+        if ($discountEnabled) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Fixed discount
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $request->discount_type === 'fixed'
+            ) {
+
+                $salePrice =
+                    max(
+                        0,
+                        $request->price -
+                            $request->discount_value
+                    );
             }
-        });
 
-        return redirect()->back()->with('success', 'Produk berhasil ditambahkan.');
-    }
+            /*
+            |--------------------------------------------------------------------------
+            | Percent discount
+            |--------------------------------------------------------------------------
+            */ elseif (
+                $request->discount_type === 'percent'
+            ) {
 
-    /*
-    |--------------------------------------------------------------------------
-    | UPDATE
-    |--------------------------------------------------------------------------
-    | Alur:
-    |   1. Update data produk
-    |   2. Hapus gambar yang di-mark deleted (hapus file + record)
-    |   3. Upload gambar baru
-    |   4. Reset semua is_primary → false
-    |   5. Set primary:
-    |        a. Jika primary_image_id terisi → set existing image
-    |        b. Jika primary_new_image_index >= 0 → set gambar baru berdasarkan urutan upload
-    |        c. Fallback otomatis ke gambar pertama
-    */
-
-    public function update(Request $request, Product $product)
-    {
-        // Normalisasi nilai kosong/null dari hidden input Alpine
-        foreach (['primary_image_id', 'primary_new_image_index'] as $field) {
-            if (in_array($request->input($field), ['', 'null', 'undefined', null], true)) {
-                $request->merge([$field => null]);
+                $salePrice =
+                    $request->price -
+                    floor(
+                        (
+                            $request->price *
+                            $request->discount_value
+                        ) / 100
+                    );
             }
         }
 
-        $request->validate([
-            'name'                    => 'required|string|max:255',
-            'category'                => 'required|string|max:255',
-            'description'             => 'required|string',
-            'price'                   => 'required|integer|min:0',
-            'stock'                   => 'required|integer|min:0',
-            'weight'                  => 'required|integer|min:0',
-            'length'                  => 'nullable|integer|min:0',
-            'width'                   => 'nullable|integer|min:0',
-            'height'                  => 'nullable|integer|min:0',
-            'status'                  => 'required|in:available,not_available',
-            'images'                  => 'nullable|array',
-            'images.*'                => 'image|mimes:jpg,jpeg,png,webp|max:2048',
-            'deleted_images'          => 'nullable|array',
-            'deleted_images.*'        => 'uuid|exists:product_images,id',
-            'primary_image_id'        => 'nullable|uuid|exists:product_images,id',
-            'primary_new_image_index' => 'nullable|integer|min:0',
-        ]);
-
-        DB::transaction(function () use ($request, $product) {
+        DB::transaction(function () use (
+            $request,
+            $discountEnabled,
+            $salePrice
+        ) {
 
             /*
-            | 1. Update data produk
+            |--------------------------------------------------------------------------
+            | Generate SKU unik
+            |--------------------------------------------------------------------------
             */
-            $product->update([
-                'name'        => $request->name,
-                'slug'        => Str::slug($request->name) . '-' . Str::random(5),
-                'category'    => $request->category,
+
+            do {
+
+                $sku =
+                    'SKU-' .
+                    strtoupper(
+                        Str::random(10)
+                    );
+            } while (
+                Product::where(
+                    'sku',
+                    $sku
+                )->exists()
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Create product
+            |--------------------------------------------------------------------------
+            */
+
+            $product = Product::create([
+
+                /*
+                |--------------------------------------------------------------------------
+                | Informasi Produk
+                |--------------------------------------------------------------------------
+                */
+
+                'name' => $request->name,
+
+                'slug' =>
+                Str::slug($request->name) .
+                    '-' .
+                    Str::lower(
+                        Str::random(5)
+                    ),
+
+                'sku' => $sku,
+
+                'category' => $request->category,
+
                 'description' => $request->description,
-                'price'       => $request->price,
-                'stock'       => $request->stock,
-                'weight'      => $request->weight,
-                'length'      => $request->length ?? 0,
-                'width'       => $request->width ?? 0,
-                'height'      => $request->height ?? 0,
-                'status'      => $request->status,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Harga
+                |--------------------------------------------------------------------------
+                */
+
+                'price' => $request->price,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Discount
+                |--------------------------------------------------------------------------
+                */
+
+                'sale_price' =>
+                $discountEnabled
+                    ? $salePrice
+                    : null,
+
+                'discount_label' =>
+                $discountEnabled
+                    ? $request->discount_label
+                    : null,
+
+                'discount_type' =>
+                $discountEnabled
+                    ? $request->discount_type
+                    : null,
+
+                'discount_value' =>
+                $discountEnabled
+                    ? $request->discount_value
+                    : null,
+
+                'discount_start_at' =>
+                $discountEnabled
+                    ? $request->discount_start_at
+                    : null,
+
+                'discount_end_at' =>
+                $discountEnabled
+                    ? $request->discount_end_at
+                    : null,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Stock
+                |--------------------------------------------------------------------------
+                */
+
+                'stock' => $request->stock,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Shipping
+                |--------------------------------------------------------------------------
+                */
+
+                'weight' => $request->weight,
+
+                'length' => $request->length,
+
+                'width' => $request->width,
+
+                'height' => $request->height,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Status
+                |--------------------------------------------------------------------------
+                */
+
+                'status' => $request->status,
             ]);
 
             /*
-            | 2. Hapus gambar yang dipilih user untuk dihapus
+            |--------------------------------------------------------------------------
+            | Upload images
+            |--------------------------------------------------------------------------
             */
-            if ($request->filled('deleted_images')) {
-                $toDelete = ProductImage::whereIn('id', $request->deleted_images)
-                    ->where('product_id', $product->id)
-                    ->get();
-
-                foreach ($toDelete as $img) {
-                    Storage::disk('public')->delete($img->image_url);
-                    $img->delete();
-                }
-            }
-
-            /*
-            | 3. Upload gambar baru & simpan urutan sort_order-nya
-            |    Kita perlu tahu ID gambar baru berdasarkan primaryNewIndex
-            */
-            $newImageIds = [];
 
             if ($request->hasFile('images')) {
-                $lastSort = ProductImage::where('product_id', $product->id)
-                    ->max('sort_order') ?? 0;
 
-                foreach ($request->file('images') as $index => $image) {
-                    $path = $image->store('product_images', 'public');
+                foreach (
+                    $request->file('images')
+                    as $index => $image
+                ) {
 
-                    $newImg = ProductImage::create([
-                        'product_id' => $product->id,
-                        'image_url'  => $path,
-                        'alt_text'   => $product->name,
-                        'sort_order' => $lastSort + $index + 1,
-                        'is_primary' => false, // set nanti di langkah 5
-                        'is_active'  => true,
+                    $path = $image->store(
+                        'products',
+                        'public'
+                    );
+
+                    ProductImage::create([
+
+                        'product_id' =>
+                        $product->id,
+
+                        'image_url' => $path,
+
+                        'alt_text' =>
+                        $product->name,
+
+                        'sort_order' => $index,
+
+                        'is_primary' =>
+                        $index === 0,
+
+                        'is_active' => true,
                     ]);
-
-                    $newImageIds[] = $newImg->id;
                 }
-            }
-
-            /*
-            | 4. Reset semua primary → false
-            */
-            ProductImage::where('product_id', $product->id)
-                ->update(['is_primary' => false]);
-
-            /*
-            | 5. Set primary
-            |    Prioritas: existing > new > fallback
-            */
-            $primarySet = false;
-
-            // 5a. Primary dari existing image
-            if ($request->filled('primary_image_id')) {
-                $affected = ProductImage::where('id', $request->primary_image_id)
-                    ->where('product_id', $product->id)
-                    ->update(['is_primary' => true]);
-
-                $primarySet = $affected > 0;
-            }
-
-            // 5b. Primary dari gambar baru (berdasarkan index urutan upload)
-            if (!$primarySet && $request->filled('primary_new_image_index')) {
-                $newIndex = (int) $request->primary_new_image_index;
-
-                if (isset($newImageIds[$newIndex])) {
-                    ProductImage::where('id', $newImageIds[$newIndex])
-                        ->update(['is_primary' => true]);
-
-                    $primarySet = true;
-                }
-            }
-
-            // 5c. Fallback: set gambar pertama yang masih ada sebagai primary
-            if (!$primarySet) {
-                ProductImage::where('product_id', $product->id)
-                    ->orderBy('sort_order')
-                    ->first()
-                    ?->update(['is_primary' => true]);
             }
         });
 
-        return redirect()->back()->with('success', 'Produk berhasil diperbarui.');
+        return redirect()
+
+            ->route('admin.management.products.index')
+
+            ->with(
+                'success',
+                'Produk berhasil ditambahkan.'
+            );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | DESTROY
+    | Show Edit Form
+    |--------------------------------------------------------------------------
+    */
+
+    public function edit(Product $product)
+    {
+        $product->load([
+            'images',
+            'primaryImage',
+        ]);
+
+        return view(
+            'products.edit',
+            compact('product')
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Update Product
+    |--------------------------------------------------------------------------
+    */
+
+    public function update(
+        Request $request,
+        Product $product
+    ) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Normalisasi hidden input
+        |--------------------------------------------------------------------------
+        */
+
+        foreach (
+            [
+                'primary_image_id',
+                'primary_new_image_index',
+            ]
+            as $field
+        ) {
+
+            if (
+                in_array(
+                    $request->input($field),
+                    [
+                        '',
+                        'null',
+                        'undefined',
+                        null,
+                    ],
+                    true
+                )
+            ) {
+
+                $request->merge([
+                    $field => null,
+                ]);
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validasi
+        |--------------------------------------------------------------------------
+        */
+
+        $request->validate([
+
+            'name' =>
+            'required|string|max:255',
+
+            'category' =>
+            'nullable|string|max:255',
+
+            'description' =>
+            'nullable|string',
+
+            'price' =>
+            'required|integer|min:0',
+
+            'discount_label' =>
+            'nullable|string|max:255',
+
+            'discount_type' =>
+            'nullable|in:fixed,percent',
+
+            'discount_value' =>
+            'nullable|numeric|min:0',
+
+            'discount_start_at' =>
+            'nullable|date',
+
+            'discount_end_at' =>
+            'nullable|date|after_or_equal:discount_start_at',
+
+            'stock' =>
+            'required|integer|min:0',
+
+            'weight' =>
+            'required|integer|min:0',
+
+            'length' =>
+            'nullable|integer|min:0',
+
+            'width' =>
+            'nullable|integer|min:0',
+
+            'height' =>
+            'nullable|integer|min:0',
+
+            'status' =>
+            'required|in:available,draft,archived',
+
+            'images.*' =>
+            'nullable|image|max:5120',
+
+            'delete_images' =>
+            'nullable|array',
+
+            'delete_images.*' =>
+            'exists:product_images,id',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validasi bisnis discount
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->filled('discount_type') &&
+            !$request->filled('discount_value')
+        ) {
+
+            return back()
+
+                ->withErrors([
+                    'discount_value' =>
+                    'Nilai diskon wajib diisi.',
+                ])
+
+                ->withInput();
+        }
+
+        if (
+            $request->discount_type === 'percent' &&
+            $request->discount_value > 100
+        ) {
+
+            return back()
+
+                ->withErrors([
+                    'discount_value' =>
+                    'Diskon persen maksimal 100%.',
+                ])
+
+                ->withInput();
+        }
+
+        if (
+            $request->discount_type === 'fixed' &&
+            $request->discount_value >= $request->price
+        ) {
+
+            return back()
+
+                ->withErrors([
+                    'discount_value' =>
+                    'Diskon nominal tidak boleh melebihi harga produk.',
+                ])
+
+                ->withInput();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Enable discount
+        |--------------------------------------------------------------------------
+        */
+
+        $discountEnabled =
+            $request->boolean('enable_discount');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Hitung sale price otomatis
+        |--------------------------------------------------------------------------
+        */
+
+        $salePrice = null;
+
+        if ($discountEnabled) {
+
+            if (
+                $request->discount_type === 'fixed'
+            ) {
+
+                $salePrice =
+                    max(
+                        0,
+                        $request->price -
+                            $request->discount_value
+                    );
+            } elseif (
+                $request->discount_type === 'percent'
+            ) {
+
+                $salePrice =
+                    $request->price -
+                    floor(
+                        (
+                            $request->price *
+                            $request->discount_value
+                        ) / 100
+                    );
+            }
+        }
+
+        DB::transaction(function () use (
+            $request,
+            $product,
+            $discountEnabled,
+            $salePrice
+        ) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update product
+            |--------------------------------------------------------------------------
+            */
+
+            $product->update([
+
+                'name' => $request->name,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Slug tidak berubah
+                |--------------------------------------------------------------------------
+                */
+
+                'category' =>
+                $request->category,
+
+                'description' =>
+                $request->description,
+
+                'price' =>
+                $request->price,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Discount
+                |--------------------------------------------------------------------------
+                */
+
+                'sale_price' =>
+                $discountEnabled
+                    ? $salePrice
+                    : null,
+
+                'discount_label' =>
+                $discountEnabled
+                    ? $request->discount_label
+                    : null,
+
+                'discount_type' =>
+                $discountEnabled
+                    ? $request->discount_type
+                    : null,
+
+                'discount_value' =>
+                $discountEnabled
+                    ? $request->discount_value
+                    : null,
+
+                'discount_start_at' =>
+                $discountEnabled
+                    ? $request->discount_start_at
+                    : null,
+
+                'discount_end_at' =>
+                $discountEnabled
+                    ? $request->discount_end_at
+                    : null,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Stock
+                |--------------------------------------------------------------------------
+                */
+
+                'stock' =>
+                $request->stock,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Shipping
+                |--------------------------------------------------------------------------
+                */
+
+                'weight' =>
+                $request->weight,
+
+                'length' =>
+                $request->length,
+
+                'width' =>
+                $request->width,
+
+                'height' =>
+                $request->height,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Status
+                |--------------------------------------------------------------------------
+                */
+
+                'status' =>
+                $request->status,
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Delete selected images
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $request->filled(
+                    'delete_images'
+                )
+            ) {
+
+                $images =
+                    ProductImage::whereIn(
+                        'id',
+                        $request->delete_images
+                    )->get();
+
+                foreach ($images as $image) {
+
+                    Storage::disk('public')
+                        ->delete(
+                            $image->image_url
+                        );
+
+                    $image->delete();
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Reset primary image
+            |--------------------------------------------------------------------------
+            */
+
+            ProductImage::where(
+                'product_id',
+                $product->id
+            )->update([
+                'is_primary' => false,
+            ]);
+
+            $primarySet = false;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Existing image jadi primary
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $request->filled(
+                    'primary_image_id'
+                )
+            ) {
+
+                ProductImage::where(
+                    'id',
+                    $request->primary_image_id
+                )->update([
+                    'is_primary' => true,
+                ]);
+
+                $primarySet = true;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Upload new images
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $request->hasFile('images')
+            ) {
+
+                $lastSortOrder =
+                    ProductImage::where(
+                        'product_id',
+                        $product->id
+                    )->max('sort_order') ?? -1;
+
+                foreach (
+                    $request->file('images')
+                    as $index => $image
+                ) {
+
+                    $path = $image->store(
+                        'products',
+                        'public'
+                    );
+
+                    $newImage =
+                        ProductImage::create([
+
+                            'product_id' =>
+                            $product->id,
+
+                            'image_url' =>
+                            $path,
+
+                            'alt_text' =>
+                            $product->name,
+
+                            'sort_order' =>
+                            $lastSortOrder +
+                                $index +
+                                1,
+
+                            'is_primary' =>
+                            false,
+
+                            'is_active' =>
+                            true,
+                        ]);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | New image jadi primary
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        !$primarySet &&
+                        $request->primary_new_image_index !== null &&
+                        (int) $request->primary_new_image_index === $index
+                    ) {
+
+                        $newImage->update([
+                            'is_primary' => true,
+                        ]);
+
+                        $primarySet = true;
+                    }
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Fallback primary image
+            |--------------------------------------------------------------------------
+            */
+
+            if (!$primarySet) {
+
+                $firstImage =
+                    ProductImage::where(
+                        'product_id',
+                        $product->id
+                    )
+
+                    ->orderBy('sort_order')
+
+                    ->first();
+
+                if ($firstImage) {
+
+                    $firstImage->update([
+                        'is_primary' => true,
+                    ]);
+                }
+            }
+        });
+
+        return redirect()
+
+            ->route('admin.management.products.index')
+
+            ->with(
+                'success',
+                'Produk berhasil diperbarui.'
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Delete Product
     |--------------------------------------------------------------------------
     */
 
     public function destroy(Product $product)
     {
-        DB::transaction(function () use ($product) {
+        DB::transaction(function () use (
+            $product
+        ) {
 
-            // Hapus semua file gambar dari storage
-            foreach ($product->images as $image) {
+            /*
+            |--------------------------------------------------------------------------
+            | Delete image files
+            |--------------------------------------------------------------------------
+            */
+
+            foreach (
+                $product->images
+                as $image
+            ) {
 
                 Storage::disk('public')
-                    ->delete($image->image_url);
+                    ->delete(
+                        $image->image_url
+                    );
+
+                $image->delete();
             }
 
             /*
-        |--------------------------------------------------------------------------
-        | Cek apakah produk pernah dipakai di order
-        |--------------------------------------------------------------------------
-        |
-        | Jika pernah diorder:
-        | -> soft delete
-        |
-        | Jika belum pernah diorder:
-        | -> hard delete untuk penghematan database
-        |
-        */
+            |--------------------------------------------------------------------------
+            | Jika pernah diorder
+            | gunakan soft delete
+            |--------------------------------------------------------------------------
+            */
 
-            $hasOrder = $product->orderItems()->exists();
+            $hasOrder =
+                $product->orderItems()
+                ->exists();
 
             if ($hasOrder) {
 
-                // Soft delete
                 $product->delete();
-            } else {
+            }
 
-                // Hard delete permanen
+            /*
+            |--------------------------------------------------------------------------
+            | Jika belum pernah diorder
+            | hard delete
+            |--------------------------------------------------------------------------
+            */ else {
+
                 $product->forceDelete();
             }
         });
 
         return redirect()
-            ->back()
-            ->with('success', 'Produk berhasil dihapus.');
+
+            ->route('products.index')
+
+            ->with(
+                'success',
+                'Produk berhasil dihapus.'
+            );
     }
 }

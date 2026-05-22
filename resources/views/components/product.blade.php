@@ -1,81 +1,101 @@
 <!-- Container Utama -->
 <div class="relative">
-    <!-- Tombol Back di Pojok Kiri Atas -->
-
-
     <!-- Looping untuk menampilkan produk dalam bentuk card -->
-    <div class="flex flex-wrap justify-center">
-        @foreach ($products as $product)
-            <div
-                class="relative m-4 flex w-full max-w-[150px] sm:max-w-[200px] md:max-w-[250px] lg:max-w-[250px] xl:max-w-[250px] flex-col overflow-hidden rounded-lg border border-gray-100 bg-white shadow-md">
-                <!-- Container utama dari card produk dengan berbagai ukuran maksimum pada layar yang berbeda -->
-
-                <a class="relative mx-2 mt-2 flex h-32 sm:h-40 md:h-48 lg:h-48 xl:h-48 overflow-hidden rounded-xl"
-                    href="{{ url('/product/' . $product->id) }}">
-                    <!-- Gambar produk dengan ukuran yang menyesuaikan tinggi pada layar yang berbeda -->
-                    <img class="object-cover w-full h-full" src="{{ $product->thumbnail }}" alt="{{ $product->name }}" />
+    <div class="flex flex-wrap justify-center gap-4">
+        @forelse ($products as $product)
+            <div class="relative flex w-full max-w-sm flex-col overflow-hidden rounded-lg border border-gray-100 bg-white shadow-md hover:shadow-lg transition-shadow">
+                
+                <!-- Link Produk + Badge Diskon -->
+                <a href="{{ url('/product/' . $product->id) }}" class="relative group">
+                    <div class="relative overflow-hidden rounded-t-lg">
+                        <img 
+                            class="aspect-square w-full object-cover group-hover:scale-105 transition-transform duration-200" 
+                            src="{{ $product->thumbnail }}" 
+                            alt="{{ $product->name }}" 
+                        />
+                        
+                        <!-- Discount Badge -->
+                        @if ($product->active_discount_type !== 'none')
+                            <div class="absolute top-2 right-2">
+                                @if ($product->active_discount_type === 'flash_sale')
+                                    <span class="inline-block px-2 py-1 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
+                                        ⚡ Flash Sale
+                                    </span>
+                                @else
+                                    <span class="inline-block px-2 py-1 text-xs font-bold text-white bg-orange-500 rounded-full">
+                                        -{{ $product->discount_percentage }}%
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
                 </a>
 
-                <div class="mt-3 px-4 pb-4">
-                    <!-- Bagian deskripsi produk -->
-                    <a href="#">
-                        <!-- Judul produk -->
-                        <h5 class="text-sm sm:text-base md:text-lg lg:text-lg xl:text-lg tracking-tight text-slate-900">
-                            {{ $product->name }}</h5>
-                    </a>
-
-                    <div class="mt-2 mb-4 flex items-center justify-between">
-                        <!-- Harga produk -->
-                        <p>
-                            <span
-                                class="text-lg sm:text-xl md:text-2xl lg:text-2xl xl:text-2xl font-bold text-slate-900">Rp
-                                {{ number_format($product->price, 0, ',', '.') }}</span>
-                        </p>
+                <!-- Product Info -->
+                <div class="flex flex-col gap-3 p-4 flex-grow">
+                    <h5 class="font-semibold text-gray-900 line-clamp-2 hover:text-blue-600">
+                        {{ $product->name }}
+                    </h5>
+                    
+                    <!-- Price Section -->
+                    <div class="flex flex-col gap-1">
+                        @if ($product->active_discount_type !== 'none')
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg font-bold text-red-600">
+                                    Rp {{ number_format($product->resolved_price, 0, ',', '.') }}
+                                </span>
+                                <span class="text-sm text-gray-400 line-through">
+                                    Rp {{ number_format($product->price, 0, ',', '.') }}
+                                </span>
+                            </div>
+                        @else
+                            <span class="text-lg font-bold text-gray-900">
+                                Rp {{ number_format($product->price, 0, ',', '.') }}
+                            </span>
+                        @endif
                     </div>
-                    @guest
-                        <a href="{{ route('login') }}"
-                            class="flex items-center justify-center rounded-md bg-slate-900 px-2 sm:px-4 lg:px-4 xl:px-4 py-1 sm:py-2 lg:py-2 xl:py-2 text-center text-xs sm:text-sm font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-blue-300">
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                class="mr-1 sm:mr-2 h-3 sm:h-4 lg:h-4 xl:h-4 w-3 sm:w-4 lg:w-4 xl:w-4" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            Add to cart
-                        </a>
-                    @endguest
-                    @auth
-                        <form action="{{ route('cart.add') }}" method="POST" class="w-full">
-                            @csrf
 
-                            <input type="hidden" name="product_id" value="{{ $product->id }}">
+                    <!-- Stock Info -->
+                    <div class="text-xs {{ $product->in_stock ? 'text-green-600' : 'text-red-600' }}">
+                        {{ $product->in_stock ? 'Stok: ' . $product->stock . ' tersedia' : 'Stok Habis' }}
+                    </div>
 
-                            <button type="submit"
-                                class="flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-blue-300">
-
-                                <svg xmlns="http://www.w3.org/2000/svg" class="mr-2 h-4 w-4" fill="none"
-                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-
+                    <!-- Add to Cart Button -->
+                    <div class="mt-auto">
+                        @guest
+                            <a href="{{ route('login') }}" class="flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                                 </svg>
-
-                                Add to cart
-                            </button>
-                        </form>
-                    @endauth
-
-
-
-
+                                Keranjang
+                            </a>
+                        @endguest
+                        @auth
+                            <form action="{{ route('cart.add') }}" method="POST" class="w-full">
+                                @csrf
+                                <input type="hidden" name="product_id" value="{{ $product->id }}">
+                                <button type="submit" {{ !$product->in_stock ? 'disabled' : '' }} class="flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    Keranjang
+                                </button>
+                            </form>
+                        @endauth
+                    </div>
                 </div>
             </div>
-        @endforeach
+        @empty
+            <div class="w-full text-center py-8 text-gray-500">
+                Produk tidak tersedia
+            </div>
+        @endforelse
     </div>
 
     <!-- Pagination -->
-    <div class="mt-6">
-        {{ $products->links() }}
-    </div>
+    @if (method_exists($products, 'links'))
+        <div class="mt-8">
+            {{ $products->links() }}
+        </div>
+    @endif
 </div>
