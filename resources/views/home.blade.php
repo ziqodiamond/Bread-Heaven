@@ -3,8 +3,11 @@
 
     <!-- Flash Sales Section -->
     <div class="px-4 py-8 md:px-6 md:py-12">
-        @include('components.flash-sales', ['flashSales' => $flashSales])
+        <x-flash-sale-carousel :flashSales="$flashSales" :itemsPerRow="3" />
     </div>
 
-    @include('components.product')
+    <!-- Latest Products Section -->
+    <div class="px-4 py-8 md:px-6 md:py-12">
+        @include('components.product')
+    </div>
 </x-layout>

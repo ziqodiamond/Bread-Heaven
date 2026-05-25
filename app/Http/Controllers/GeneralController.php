@@ -11,7 +11,10 @@ class GeneralController extends Controller
 {
     public function index()
     {
-        $products = Product::paginate(30);
+        $products = Product::latest()
+            ->limit(12)
+            ->paginate(12);
+        
         $cartItems = Auth::check() && Auth::user()->cart ? Auth::user()->cart->items : collect();
         
         // Get active flash sales for homepage
@@ -22,8 +25,6 @@ class GeneralController extends Controller
             ->with('items')
             ->get();
 
-        // dd($cartItems); // Debugging data
-
         return view('home',  [
             'cartItems' => $cartItems,
             'products' => $products,
@@ -32,16 +33,70 @@ class GeneralController extends Controller
     }
 
 
-    public function products()
+    public function products(Request $request)
     {
-        $products = Product::paginate(30);
+        $query = Product::query();
+
+        // Search filter
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+        }
+
+        // Category filter
+        if ($request->filled('category')) {
+            $query->where('category', $request->input('category'));
+        }
+
+        // Price range filter
+        if ($request->filled('min_price')) {
+            $query->where('price', '>=', $request->input('min_price'));
+        }
+        if ($request->filled('max_price')) {
+            $query->where('price', '<=', $request->input('max_price'));
+        }
+
+        // Discount filter
+        if ($request->filled('discount_type')) {
+            $discountType = $request->input('discount_type');
+            if ($discountType === 'flash_sale') {
+                $query->where('active_discount_type', 'flash_sale');
+            } elseif ($discountType === 'discount') {
+                $query->where('active_discount_type', 'discount');
+            } elseif ($discountType === 'none') {
+                $query->where('active_discount_type', 'none');
+            }
+        }
+
+        // Sort options
+        $sort = $request->input('sort', 'newest');
+        match ($sort) {
+            'newest' => $query->latest(),
+            'oldest' => $query->oldest(),
+            'price_asc' => $query->orderBy('price', 'asc'),
+            'price_desc' => $query->orderBy('price', 'desc'),
+            default => $query->latest(),
+        };
+
+        $products = $query->paginate(12);
         $cartItems = Auth::check() && Auth::user()->cart ? Auth::user()->cart->items : collect();
 
-        // dd($cartItems); // Debugging data
+        // Get all available categories for filter dropdown
+        $categories = Product::distinct('category')
+            ->where('category', '!=', null)
+            ->pluck('category');
 
         return view('products', [
             'cartItems' => $cartItems,
             'products' => $products,
+            'categories' => $categories,
+            'search' => $request->input('search', ''),
+            'category' => $request->input('category', ''),
+            'min_price' => $request->input('min_price', ''),
+            'max_price' => $request->input('max_price', ''),
+            'discount_type' => $request->input('discount_type', ''),
+            'sort' => $sort,
         ]);
     }
 
@@ -83,4 +138,5 @@ class GeneralController extends Controller
         ]);
     }
 }
+
 
