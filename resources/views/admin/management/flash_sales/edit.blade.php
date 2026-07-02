@@ -23,7 +23,7 @@
         </div>
 
         {{-- ── Flash Sale Info ──────────────────────────────────────── --}}
-        <form action="{{ route('admin.management.flash_sales.update', $flashSale) }}" method="POST"
+        <form action="{{ route('admin.management.flash_sales.update', $flashSale) }}" method="POST" enctype="multipart/form-data"
             class="rounded-xl border border-gray-100 bg-white p-5 space-y-5">
 
             @csrf
@@ -67,24 +67,42 @@
             <div class="space-y-4 border-t pt-4">
                 <h3 class="text-sm font-medium text-gray-900">Banner & Thumbnail</h3>
                 
+                @if($flashSale->banner)
+                    <div class="space-y-2">
+                        <p class="text-xs font-medium text-gray-600">Banner Saat Ini:</p>
+                        <img src="{{ $flashSale->banner_url }}" alt="Banner" class="h-32 w-full object-cover rounded-lg border border-gray-200">
+                    </div>
+                @endif
+                
                 <div class="space-y-1.5">
                     <label for="banner" class="block text-xs font-medium text-gray-600">
-                        Banner URL
+                        Ubah Banner (Gambar)
                     </label>
-                    <input type="text" name="banner" id="banner" value="{{ old('banner', $flashSale->banner) }}"
-                        placeholder="https://example.com/banner.jpg"
-                        class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
-                               placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+                    <div class="flex items-center gap-3">
+                        <input type="file" name="banner" id="banner" accept="image/*"
+                            class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                                   focus:border-gray-400 focus:outline-none focus:ring-0">
+                    </div>
+                    <p class="text-xs text-gray-400">Maksimal 5MB, format: JPG, PNG, GIF</p>
                 </div>
+
+                @if($flashSale->thumbnail)
+                    <div class="space-y-2">
+                        <p class="text-xs font-medium text-gray-600">Thumbnail Saat Ini:</p>
+                        <img src="{{ $flashSale->thumbnail_url }}" alt="Thumbnail" class="h-20 w-20 object-cover rounded-lg border border-gray-200">
+                    </div>
+                @endif
 
                 <div class="space-y-1.5">
                     <label for="thumbnail" class="block text-xs font-medium text-gray-600">
-                        Thumbnail URL
+                        Ubah Thumbnail (Gambar)
                     </label>
-                    <input type="text" name="thumbnail" id="thumbnail" value="{{ old('thumbnail', $flashSale->thumbnail) }}"
-                        placeholder="https://example.com/thumbnail.jpg"
-                        class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
-                               placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+                    <div class="flex items-center gap-3">
+                        <input type="file" name="thumbnail" id="thumbnail" accept="image/*"
+                            class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                                   focus:border-gray-400 focus:outline-none focus:ring-0">
+                    </div>
+                    <p class="text-xs text-gray-400">Maksimal 5MB, format: JPG, PNG, GIF</p>
                 </div>
             </div>
 

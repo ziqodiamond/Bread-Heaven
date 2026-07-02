@@ -7,6 +7,7 @@ use App\Models\FlashSaleItem;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Storage;
 
 class FlashSaleController extends Controller
 {
@@ -49,8 +50,8 @@ class FlashSaleController extends Controller
         $request->validate([
             'name'              => 'required|string|max:255',
             'description'       => 'nullable|string',
-            'banner'            => 'nullable|string|url',
-            'thumbnail'         => 'nullable|string|url',
+            'banner'            => 'nullable|image|mimes:jpeg,png,gif,webp|max:5120',
+            'thumbnail'         => 'nullable|image|mimes:jpeg,png,gif,webp|max:5120',
             'label'             => 'required|string|max:100',
             'badge_color'       => 'nullable|string|max:50',
             'start_at'          => 'required|date_format:Y-m-d H:i',
@@ -63,12 +64,24 @@ class FlashSaleController extends Controller
             'meta_description'  => 'nullable|string|max:500',
         ]);
 
+        $data = $request->only([
+            'name', 'description', 'label', 'badge_color',
+            'start_at', 'end_at', 'is_active', 'show_countdown',
+            'show_in_homepage', 'sort_order', 'meta_title', 'meta_description'
+        ]);
+
+        // Upload banner
+        if ($request->hasFile('banner')) {
+            $data['banner'] = $request->file('banner')->store('flash_sales/banners', 'public');
+        }
+
+        // Upload thumbnail
+        if ($request->hasFile('thumbnail')) {
+            $data['thumbnail'] = $request->file('thumbnail')->store('flash_sales/thumbnails', 'public');
+        }
+
         $flashSale = FlashSale::create(array_merge(
-            $request->only([
-                'name', 'slug', 'description', 'banner', 'thumbnail', 'label', 'badge_color',
-                'start_at', 'end_at', 'is_active', 'show_countdown',
-                'show_in_homepage', 'sort_order', 'meta_title', 'meta_description'
-            ]),
+            $data,
             [
                 'slug' => str()->slug($request->name),
                 'status' => 'scheduled',
@@ -99,8 +112,8 @@ class FlashSaleController extends Controller
         $request->validate([
             'name'              => 'required|string|max:255',
             'description'       => 'nullable|string',
-            'banner'            => 'nullable|string|url',
-            'thumbnail'         => 'nullable|string|url',
+            'banner'            => 'nullable|image|mimes:jpeg,png,gif,webp|max:5120',
+            'thumbnail'         => 'nullable|image|mimes:jpeg,png,gif,webp|max:5120',
             'label'             => 'required|string|max:100',
             'badge_color'       => 'nullable|string|max:50',
             'start_at'          => 'required|date_format:Y-m-d H:i',
@@ -113,11 +126,31 @@ class FlashSaleController extends Controller
             'meta_description'  => 'nullable|string|max:500',
         ]);
 
-        $flashSale->update($request->only([
-            'name', 'description', 'banner', 'thumbnail', 'label', 'badge_color',
+        $data = $request->only([
+            'name', 'description', 'label', 'badge_color',
             'start_at', 'end_at', 'is_active', 'show_countdown',
             'show_in_homepage', 'sort_order', 'meta_title', 'meta_description'
-        ]));
+        ]);
+
+        // Upload banner
+        if ($request->hasFile('banner')) {
+            // Hapus file lama jika ada
+            if ($flashSale->banner && Storage::disk('public')->exists($flashSale->banner)) {
+                Storage::disk('public')->delete($flashSale->banner);
+            }
+            $data['banner'] = $request->file('banner')->store('flash_sales/banners', 'public');
+        }
+
+        // Upload thumbnail
+        if ($request->hasFile('thumbnail')) {
+            // Hapus file lama jika ada
+            if ($flashSale->thumbnail && Storage::disk('public')->exists($flashSale->thumbnail)) {
+                Storage::disk('public')->delete($flashSale->thumbnail);
+            }
+            $data['thumbnail'] = $request->file('thumbnail')->store('flash_sales/thumbnails', 'public');
+        }
+
+        $flashSale->update($data);
 
         // Auto-refresh status
         $flashSale->refreshStatus();
