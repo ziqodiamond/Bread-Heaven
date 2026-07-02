@@ -63,6 +63,31 @@
                 </div>
             </div>
 
+            {{-- Banner & Thumbnail --}}
+            <div class="space-y-4 border-t pt-4">
+                <h3 class="text-sm font-medium text-gray-900">Banner & Thumbnail</h3>
+                
+                <div class="space-y-1.5">
+                    <label for="banner" class="block text-xs font-medium text-gray-600">
+                        Banner URL
+                    </label>
+                    <input type="text" name="banner" id="banner" value="{{ old('banner', $flashSale->banner) }}"
+                        placeholder="https://example.com/banner.jpg"
+                        class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                               placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+                </div>
+
+                <div class="space-y-1.5">
+                    <label for="thumbnail" class="block text-xs font-medium text-gray-600">
+                        Thumbnail URL
+                    </label>
+                    <input type="text" name="thumbnail" id="thumbnail" value="{{ old('thumbnail', $flashSale->thumbnail) }}"
+                        placeholder="https://example.com/thumbnail.jpg"
+                        class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                               placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+                </div>
+            </div>
+
             {{-- Jadwal --}}
             <div class="space-y-4 border-t pt-4">
                 <h3 class="text-sm font-medium text-gray-900">Jadwal Flash Sale</h3>

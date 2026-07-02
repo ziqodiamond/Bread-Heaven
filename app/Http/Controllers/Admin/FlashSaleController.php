@@ -49,6 +49,8 @@ class FlashSaleController extends Controller
         $request->validate([
             'name'              => 'required|string|max:255',
             'description'       => 'nullable|string',
+            'banner'            => 'nullable|string|url',
+            'thumbnail'         => 'nullable|string|url',
             'label'             => 'required|string|max:100',
             'badge_color'       => 'nullable|string|max:50',
             'start_at'          => 'required|date_format:Y-m-d H:i',
@@ -63,7 +65,7 @@ class FlashSaleController extends Controller
 
         $flashSale = FlashSale::create(array_merge(
             $request->only([
-                'name', 'slug', 'description', 'label', 'badge_color',
+                'name', 'slug', 'description', 'banner', 'thumbnail', 'label', 'badge_color',
                 'start_at', 'end_at', 'is_active', 'show_countdown',
                 'show_in_homepage', 'sort_order', 'meta_title', 'meta_description'
             ]),
@@ -97,6 +99,8 @@ class FlashSaleController extends Controller
         $request->validate([
             'name'              => 'required|string|max:255',
             'description'       => 'nullable|string',
+            'banner'            => 'nullable|string|url',
+            'thumbnail'         => 'nullable|string|url',
             'label'             => 'required|string|max:100',
             'badge_color'       => 'nullable|string|max:50',
             'start_at'          => 'required|date_format:Y-m-d H:i',
@@ -110,7 +114,7 @@ class FlashSaleController extends Controller
         ]);
 
         $flashSale->update($request->only([
-            'name', 'description', 'label', 'badge_color',
+            'name', 'description', 'banner', 'thumbnail', 'label', 'badge_color',
             'start_at', 'end_at', 'is_active', 'show_countdown',
             'show_in_homepage', 'sort_order', 'meta_title', 'meta_description'
         ]));
