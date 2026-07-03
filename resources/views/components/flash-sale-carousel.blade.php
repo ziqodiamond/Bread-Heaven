@@ -12,14 +12,14 @@
 @php
     use App\Helpers\ColorHelper;
 
-    // Ambil hanya flash sale yang sedang berjalan
-    $runningFlashSales = $flashSales->filter(fn($fs) => $fs->is_running ?? false);
+    // Ambil flash sale yang show_in_homepage sesuai setting (termasuk akan datang & telah berakhir)
+    $visibleFlashSales = $flashSales->filter(fn($fs) => $fs->show_in_homepage ?? false);
 @endphp
 
 <div class="relative max-w-7xl mx-auto px-4">
-    @if ($runningFlashSales->isNotEmpty())
+    @if ($visibleFlashSales->isNotEmpty())
         {{-- Looping per flash sale, masing-masing jadi 1 section --}}
-        @foreach ($runningFlashSales as $flashSale)
+        @foreach ($visibleFlashSales as $flashSale)
             @php
                 // Ambil warna dari badge_color di database, gunakan ColorHelper untuk konsistensi
                 $badgeColor = $flashSale->badge_color ?? 'red';
@@ -28,14 +28,33 @@
                 $endColor = ColorHelper::getColorRGB($badgeColor, 'end');
             @endphp
             <div class="mb-8" x-data="{
+                isRunning: {{ $flashSale->is_running ? 'true' : 'false' }},
+                hasEnded: {{ $flashSale->has_ended ? 'true' : 'false' }},
+                hasStarted: {{ $flashSale->has_started ? 'true' : 'false' }},
+                showCountdown: {{ $flashSale->show_countdown ? 'true' : 'false' }},
                 endTime: {{ $flashSale->end_at->timestamp }},
+                startTime: {{ $flashSale->start_at->timestamp }},
                 days: '00',
                 hours: '00',
                 minutes: '00',
                 seconds: '00',
                 tick() {
-                    const remaining = this.endTime - Math.floor(Date.now() / 1000);
-                    if (remaining <= 0) { this.days = this.hours = this.minutes = this.seconds = '00'; return; }
+                    const now = Math.floor(Date.now() / 1000);
+                    let remaining;
+                    
+                    if (this.isRunning) {
+                        remaining = this.endTime - now;
+                    } else if (!this.hasStarted) {
+                        remaining = this.startTime - now;
+                    } else {
+                        remaining = 0;
+                    }
+                    
+                    if (remaining <= 0) { 
+                        this.days = this.hours = this.minutes = this.seconds = '00'; 
+                        return; 
+                    }
+                    
                     this.days = String(Math.floor(remaining / 86400)).padStart(2, '0');
                     this.hours = String(Math.floor((remaining % 86400) / 3600)).padStart(2, '0');
                     this.minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
@@ -58,21 +77,45 @@
                             </span>
                         </div>
 
-                        {{-- Kotak Countdown --}}
-                        <div class="flex items-center gap-1">
-                            <template x-if="days !== '00'">
+                        {{-- Status Badge --}}
+                        <template x-if="hasEnded">
+                            <span class="inline-block px-2 py-1 text-xs font-bold text-red-700 bg-red-100 rounded">
+                                ✓ Telah Berakhir
+                            </span>
+                        </template>
+                        <template x-if="isRunning && !hasEnded">
+                            <span class="inline-block px-2 py-1 text-xs font-bold text-white rounded animate-pulse"
+                                style="background-color: {{ $primaryColor }};">
+                                🔥 Sedang Berlangsung
+                            </span>
+                        </template>
+                        <template x-if="!isRunning && !hasStarted">
+                            <span class="inline-block px-2 py-1 text-xs font-bold text-white rounded"
+                                style="background-color: {{ $primaryColor }}; opacity: 0.6;">
+                                ⏰ Akan Datang
+                            </span>
+                        </template>
+
+                        {{-- Countdown --}}
+                        <template x-if="showCountdown && !hasEnded">
+                            <div class="flex items-center gap-1">
+                                <span class="text-xs font-bold text-gray-600 mr-1" x-show="isRunning">Berakhir:</span>
+                                <span class="text-xs font-bold text-gray-600 mr-1" x-show="!isRunning">Dimulai:</span>
+                                
+                                <template x-if="days !== '00'">
+                                    <span class="rounded px-2 py-1 text-xs font-bold text-white"
+                                        style="background-color: {{ $primaryColor }};" x-text="days"></span>
+                                </template>
                                 <span class="rounded px-2 py-1 text-xs font-bold text-white"
-                                    style="background-color: {{ $primaryColor }};" x-text="days"></span>
-                            </template>
-                            <span class="rounded px-2 py-1 text-xs font-bold text-white"
-                                style="background-color: {{ $primaryColor }};" x-text="hours"></span>
-                            <span class="text-xs font-bold" style="color: {{ $primaryColor }};">:</span>
-                            <span class="rounded px-2 py-1 text-xs font-bold text-white"
-                                style="background-color: {{ $primaryColor }};" x-text="minutes"></span>
-                            <span class="text-xs font-bold" style="color: {{ $primaryColor }};">:</span>
-                            <span class="rounded px-2 py-1 text-xs font-bold text-white"
-                                style="background-color: {{ $primaryColor }};" x-text="seconds"></span>
-                        </div>
+                                    style="background-color: {{ $primaryColor }};" x-text="hours"></span>
+                                <span class="text-xs font-bold" style="color: {{ $primaryColor }};">:</span>
+                                <span class="rounded px-2 py-1 text-xs font-bold text-white"
+                                    style="background-color: {{ $primaryColor }};" x-text="minutes"></span>
+                                <span class="text-xs font-bold" style="color: {{ $primaryColor }};">:</span>
+                                <span class="rounded px-2 py-1 text-xs font-bold text-white"
+                                    style="background-color: {{ $primaryColor }};" x-text="seconds"></span>
+                            </div>
+                        </template>
 
                         @if ($flashSale->label)
                             <span
@@ -129,29 +172,36 @@
                                 </div> --}}
 
                                     {{-- Badge persen diskon (pojok kanan atas, model "petir") --}}
-                                    <div class="absolute right-0 top-0">
-                                        <div class="flex items-center gap-0.5 rounded-bl-lg px-1.5 py-1"
-                                            style="background-color: {{ $accentColor }};">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24"
-                                                fill="currentColor" style="color: {{ $primaryColor }};">
-                                                <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" />
-                                            </svg>
-                                            <span
-                                                class="text-xs font-extrabold text-white">-{{ $item->discount_percentage }}%</span>
+                                    <template x-if="isRunning">
+                                        <div class="absolute right-0 top-0">
+                                            <div class="flex items-center gap-0.5 rounded-bl-lg px-1.5 py-1"
+                                                style="background-color: {{ $accentColor }};">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24"
+                                                    fill="currentColor" style="color: {{ $primaryColor }};">
+                                                    <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" />
+                                                </svg>
+                                                <span
+                                                    class="text-xs font-extrabold text-white">-{{ $item->discount_percentage }}%</span>
+                                            </div>
                                         </div>
-                                    </div>
+                                    </template>
                                 </div>
 
                                 {{-- Info harga + stok --}}
                                 <div class="p-2">
 
                                     <div class="flex items-center gap-2">
-                                        <span class="text-lg font-bold "style="color: {{ $endColor }};">
-                                            Rp {{ number_format($item->sale_price, 0, ',', '.') }}
-                                        </span>
-                                        <span class="text-sm text-gray-400 line-through">
-                                            Rp {{ number_format($item->product->price, 0, ',', '.') }}
-                                        </span>
+                                        <template x-if="isRunning">
+                                            <span class="text-lg font-bold "style="color: {{ $endColor }};">
+                                                Rp {{ number_format($item->sale_price, 0, ',', '.') }}
+                                            </span>
+                                            <span class="text-sm text-gray-400 line-through">
+                                                Rp {{ number_format($item->product->price, 0, ',', '.') }}
+                                            </span>
+                                        </template>
+                                        <template x-if="!isRunning">
+                                            <span class="text-xs text-gray-500 italic">Harga rahasia</span>
+                                        </template>
                                     </div>
                                     {{-- Progress bar stok terbatas --}}
                                     <div class="relative mt-1.5 h-4 overflow-hidden rounded-full"
