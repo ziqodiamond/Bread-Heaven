@@ -29,13 +29,13 @@
             @forelse($visibleFlashSales as $flashSale)
                 <div class="flex-shrink-0 w-80">
                     <!-- Flash Sale Card -->
-                    <div class="rounded-xl border border-gray-100 bg-white overflow-hidden shadow-md hover:shadow-lg transition-shadow {{ $flashSale->has_ended ? 'opacity-75' : '' }}">
+                    <div class="rounded-xl border border-gray-100 bg-white overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                         <!-- Flash Sale Header -->
                         <div class="relative p-4 text-white" style="background: linear-gradient(to right, var(--color-start), var(--color-end)); --color-start: {{ getColorRGB($flashSale->badge_color, 'start') }}; --color-end: {{ getColorRGB($flashSale->badge_color, 'end') }};">
                             <div class="flex items-start justify-between">
                                 <div>
                                     <h3 class="text-lg font-bold">{{ $flashSale->name }}</h3>
-                                    <p class="text-xs {{ $flashSale->has_ended ? 'text-gray-100' : 'text-white text-opacity-90' }} mt-1">{{ $flashSale->label }}</p>
+                                    <p class="text-xs text-white text-opacity-90 mt-1">{{ $flashSale->label }}</p>
                                 </div>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 opacity-75" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2z"/>
@@ -48,10 +48,6 @@
                                     <span class="inline-block px-3 py-1.5 bg-white rounded-full text-xs font-bold animate-pulse" style="color: {{ getColorRGB($flashSale->badge_color, 'text') }};">
                                         🔥 Sedang Berlangsung
                                     </span>
-                                @elseif($flashSale->has_ended)
-                                    <span class="inline-block px-3 py-1.5 bg-white text-gray-700 rounded-full text-xs font-bold">
-                                        ✓ SELESAI
-                                    </span>
                                 @elseif(!$flashSale->has_started)
                                     <span class="inline-block px-3 py-1.5 rounded-full text-xs font-bold text-white bg-white bg-opacity-30">
                                         ⏰ Akan Datang
@@ -62,9 +58,9 @@
 
                         <!-- Countdown Section -->
                         <div class="p-4 border-b border-gray-100 bg-gray-50">
-                            @if($flashSale->show_countdown && !$flashSale->has_ended)
-                                <div class="text-center">
-                                    @if($flashSale->is_running)
+                            @if($flashSale->show_countdown)
+                                @if($flashSale->is_running)
+                                    <div class="text-center">
                                         <p class="text-xs font-medium text-gray-600 mb-2">Berakhir dalam:</p>
                                         <div class="flex justify-center gap-2">
                                             <div class="flex flex-col items-center">
@@ -96,22 +92,20 @@
                                             </div>
                                         </div>
                                         <input type="hidden" class="flash-end-time" data-flashsale-id="{{ $flashSale->id }}" value="{{ $flashSale->end_at->timestamp }}">
-                                    @elseif(!$flashSale->has_started)
-                                        <div class="text-center py-4">
-                                            <div class="mb-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-yellow-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </div>
-                                            <p class="text-sm font-bold text-gray-700">
-                                                Akan Dimulai
-                                            </p>
-                                            <p class="text-xs text-gray-500 mt-2">
-                                                Mulai: {{ $flashSale->start_at->format('d M Y H:i') }}
-                                            </p>
+                                    </div>
+                                @else
+                                    <div class="text-center py-4">
+                                        <div class="mb-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-yellow-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
                                         </div>
-                                    @endif
-                                </div>
+                                        <p class="text-sm font-bold text-gray-700">Akan Dimulai</p>
+                                        <p class="text-xs text-gray-500 mt-2">Mulai: {{ $flashSale->start_at->format('d M Y H:i') }}</p>
+                                    </div>
+                                @endif
+                            @else
+                                <div class="h-4"></div>
                             @endif
                         </div>
 
@@ -156,17 +150,11 @@
 
                         <!-- View Button -->
                         <div class="p-4 border-t border-gray-100 bg-gray-50">
-                            @if($flashSale->has_ended)
-                                <button disabled class="block w-full text-center rounded-lg bg-gray-400 px-4 py-2 text-sm font-bold text-gray-600 cursor-not-allowed">
-                                    Flash Sale Selesai
-                                </button>
-                            @else
-                                <a href="{{ route('products') }}#flash-sale-{{ $flashSale->slug }}" 
-                                    class="block w-full text-center rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90 transition-opacity"
-                                    style="background: linear-gradient(to right, {{ getColorRGB($flashSale->badge_color, 'start') }}, {{ getColorRGB($flashSale->badge_color, 'end') }});">
-                                    Lihat Produk
-                                </a>
-                            @endif
+                            <a href="{{ route('products') }}#flash-sale-{{ $flashSale->slug }}" 
+                                class="block w-full text-center rounded-lg px-4 py-2 text-sm font-bold text-white hover:opacity-90 transition-opacity"
+                                style="background: linear-gradient(to right, {{ getColorRGB($flashSale->badge_color, 'start') }}, {{ getColorRGB($flashSale->badge_color, 'end') }});">
+                                Lihat Produk
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -175,8 +163,7 @@
         </div>
     </div>
 </div>
-
-<script>
+@endif
     // Real-time countdown function
     function updateCountdowns() {
         const now = Math.floor(Date.now() / 1000);
