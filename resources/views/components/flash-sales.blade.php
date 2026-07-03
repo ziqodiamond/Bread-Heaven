@@ -1,4 +1,10 @@
-@if($flashSales->isNotEmpty())
+@php
+    $visibleFlashSales = $flashSales->filter(function($fs) {
+        return $fs->show_in_homepage && !$fs->has_ended;
+    });
+@endphp
+
+@if($visibleFlashSales->isNotEmpty())
 <div class="relative mb-8">
     <!-- Header -->
     <div class="mb-6 flex items-center justify-between">
@@ -20,7 +26,7 @@
     <!-- Flash Sales Carousel -->
     <div class="overflow-x-auto pb-4">
         <div class="flex gap-4 min-w-max">
-            @forelse($flashSales as $flashSale)
+            @forelse($visibleFlashSales as $flashSale)
                 <div class="flex-shrink-0 w-80">
                     <!-- Flash Sale Card -->
                     <div class="rounded-xl border border-gray-100 bg-white overflow-hidden shadow-md hover:shadow-lg transition-shadow {{ $flashSale->has_ended ? 'opacity-75' : '' }}">
@@ -56,7 +62,7 @@
 
                         <!-- Countdown Section -->
                         <div class="p-4 border-b border-gray-100 bg-gray-50">
-                            @if($flashSale->show_countdown)
+                            @if($flashSale->show_countdown && !$flashSale->has_ended)
                                 <div class="text-center">
                                     @if($flashSale->is_running)
                                         <p class="text-xs font-medium text-gray-600 mb-2">Berakhir dalam:</p>
@@ -90,21 +96,7 @@
                                             </div>
                                         </div>
                                         <input type="hidden" class="flash-end-time" data-flashsale-id="{{ $flashSale->id }}" value="{{ $flashSale->end_at->timestamp }}">
-                                    @elseif($flashSale->has_ended)
-                                        <div class="flex flex-col items-center justify-center py-4">
-                                            <div class="mb-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </div>
-                                            <p class="text-lg font-bold text-gray-700">
-                                                SELESAI
-                                            </p>
-                                            <p class="text-xs text-gray-500 mt-2">
-                                                Berakhir: {{ $flashSale->end_at->format('d M Y H:i') }}
-                                            </p>
-                                        </div>
-                                    @else
+                                    @elseif(!$flashSale->has_started)
                                         <div class="text-center py-4">
                                             <div class="mb-2">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-yellow-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">

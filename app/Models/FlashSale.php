@@ -386,6 +386,7 @@ class FlashSale extends Model
 
         $this->update([
             'status' => 'expired',
+            'show_in_homepage' => false,
         ]);
     }
 }

@@ -157,24 +157,39 @@
             <div class="space-y-4 border-t pt-4">
                 <h3 class="text-sm font-medium text-gray-900">Pengaturan</h3>
                 
-                <div class="space-y-3">
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" name="is_active" value="1" {{ old('is_active', $flashSale->is_active) ? 'checked' : '' }}
-                            class="h-4 w-4 rounded border-gray-300">
+                <div class="space-y-4">
+                    <!-- Aktif Toggle -->
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <span class="text-sm text-gray-600">Aktif</span>
-                    </label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="hidden" name="is_active" value="0">
+                            <input type="checkbox" name="is_active" value="1" {{ old('is_active', $flashSale->is_active) ? 'checked' : '' }}
+                                class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:border after:border-gray-300 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
                     
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" name="show_countdown" value="1" {{ old('show_countdown', $flashSale->show_countdown) ? 'checked' : '' }}
-                            class="h-4 w-4 rounded border-gray-300">
+                    <!-- Tampilkan Countdown Toggle -->
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <span class="text-sm text-gray-600">Tampilkan countdown</span>
-                    </label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="hidden" name="show_countdown" value="0">
+                            <input type="checkbox" name="show_countdown" value="1" {{ old('show_countdown', $flashSale->show_countdown) ? 'checked' : '' }}
+                                class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:border after:border-gray-300 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
                     
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" name="show_in_homepage" value="1" {{ old('show_in_homepage', $flashSale->show_in_homepage) ? 'checked' : '' }}
-                            class="h-4 w-4 rounded border-gray-300">
+                    <!-- Tampilkan di Homepage Toggle -->
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <span class="text-sm text-gray-600">Tampilkan di homepage</span>
-                    </label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="hidden" name="show_in_homepage" value="0">
+                            <input type="checkbox" name="show_in_homepage" value="1" {{ old('show_in_homepage', $flashSale->show_in_homepage) ? 'checked' : '' }}
+                                class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:border after:border-gray-300 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
