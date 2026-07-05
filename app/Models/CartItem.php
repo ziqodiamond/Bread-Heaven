@@ -107,14 +107,16 @@ class CartItem extends Model
 
     /**
      * Harga final produk realtime
+     * Prioritas: Flash Sale > Product Discount > Harga Normal
      */
     public function getProductPriceAttribute(): int
     {
-        return $this->product?->final_price ?? 0;
+        return $this->product?->resolved_price ?? 0;
     }
 
     /**
      * Jumlah discount produk
+     * Mempertimbangkan flash sale (prioritas) dan product discount
      */
     public function getDiscountAmountAttribute(): int
     {
@@ -122,16 +124,33 @@ class CartItem extends Model
             return 0;
         }
 
-        return $this->product->discount_amount
-            * $this->quantity;
+        // Flash sale priority
+        if ($this->product->is_flash_sale && $this->product->activeFlashSaleItem) {
+            $discount = $this->product->price - $this->product->activeFlashSaleItem->sale_price;
+            return max(0, $discount) * $this->quantity;
+        }
+
+        // Product discount
+        return $this->product->discount_amount * $this->quantity;
     }
 
     /**
      * Persentase discount produk
+     * Mempertimbangkan flash sale (prioritas) dan product discount
      */
     public function getDiscountPercentageAttribute(): int
     {
-        return $this->product?->discount_percentage ?? 0;
+        if (!$this->product || $this->product->price <= 0) {
+            return 0;
+        }
+
+        // Flash sale priority
+        if ($this->product->is_flash_sale && $this->product->activeFlashSaleItem) {
+            $discount = $this->product->price - $this->product->activeFlashSaleItem->sale_price;
+            return (int) round((max(0, $discount) / $this->product->price) * 100);
+        }
+
+        return $this->product->discount_percentage;
     }
 
     /**
@@ -149,15 +168,16 @@ class CartItem extends Model
 
     /**
      * Subtotal item cart setelah discount
+     * Prioritas: Flash Sale > Product Discount > Harga Normal
      */
     public function getSubtotalAttribute(): int
     {
-        if (!$this->product) {
-            return 0;
-        }
+       if (!$this->product) {
+           return 0;
+       }
 
-        return $this->product->final_price
-            * $this->quantity;
+       return $this->product->resolved_price
+           * $this->quantity;
     }
 
     /**

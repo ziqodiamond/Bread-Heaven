@@ -123,7 +123,7 @@
                         @endif
                     </div>
 
-                    <a href="{{ route('products') }}?flash_sale={{ $flashSale->id }}"
+                    <a href="{{ route('flashsale.show', $flashSale) }}"
                         class="flex items-center text-sm font-medium transition-colors hover:opacity-80"
                         style="color: {{ $endColor }};">
                         Lihat Semua

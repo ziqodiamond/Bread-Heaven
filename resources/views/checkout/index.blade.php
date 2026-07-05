@@ -610,6 +610,29 @@
         <form action="{{ route('checkout.store') }}" method="POST">
             @csrf
 
+            {{-- Jika ada alert dari server (perubahan harga/stok) tampilkan popup sederhana --}}
+            @if(session('checkout_alerts'))
+                <div class="mb-4 p-4 rounded-lg bg-yellow-50 border border-yellow-200 text-sm text-yellow-800" role="alert">
+                    <strong>Perubahan terjadi pada pesanan Anda:</strong>
+                    <ul class="mt-2 ml-4 list-disc">
+                        @foreach(session('checkout_alerts') as $msg)
+                            <li>{{ $msg }}</li>
+                        @endforeach
+                    </ul>
+                    <p class="mt-2">Silakan cek kembali pesanan lalu lanjutkan.</p>
+                </div>
+            @endif
+
+            {{-- Hidden field: kirim harga & qty yang ditampilkan di halaman checkout --}}
+            @foreach ($cart->items as $item)
+                @php $pid = $item->product_id ?? ($item->product->id ?? null); @endphp
+                @if($pid)
+                    <input type="hidden" name="selected_prices[{{ $pid }}]" value="{{ $item->product_price }}">
+                    <input type="hidden" name="selected_quantities[{{ $pid }}]" value="{{ $item->quantity }}">
+                @endif
+            @endforeach
+            <input type="hidden" name="selected_subtotal" value="{{ $subtotal }}">
+
             {{-- Mode pengiriman --}}
             <input type="hidden" name="delivery_mode" :value="deliveryMode">
 

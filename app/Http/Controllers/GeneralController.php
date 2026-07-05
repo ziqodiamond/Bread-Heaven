@@ -61,11 +61,11 @@ class GeneralController extends Controller
         if ($request->filled('discount_type')) {
             $discountType = $request->input('discount_type');
             if ($discountType === 'flash_sale') {
-                $query->where('active_discount_type', 'flash_sale');
-            } elseif ($discountType === 'discount') {
-                $query->where('active_discount_type', 'discount');
+                $query->flashSaleActive();
+            } elseif ($discountType === 'product_discount' || $discountType === 'discount') {
+                $query->discountActive();
             } elseif ($discountType === 'none') {
-                $query->where('active_discount_type', 'none');
+                $query->whereNull('sale_price');
             }
         }
 
@@ -137,6 +137,42 @@ class GeneralController extends Controller
             'data' => $statuses,
         ]);
     }
+
+    /**
+     * Show flash sale detail page with products
+     */
+    public function flashSaleDetail(FlashSale $flashSale, Request $request)
+    {
+        // Get flash sale items with pagination
+        $query = $flashSale->items();
+
+        // Search filter
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where('product_name', 'like', "%{$search}%");
+        }
+
+        // Sort options
+        $sort = $request->input('sort', 'newest');
+        match ($sort) {
+            'newest' => $query->latest(),
+            'oldest' => $query->oldest(),
+            'price_asc' => $query->orderBy('sale_price', 'asc'),
+            'price_desc' => $query->orderBy('sale_price', 'desc'),
+            'discount' => $query->orderByDesc('discount_percentage'),
+            default => $query->latest(),
+        };
+
+        $items = $query->paginate(12);
+
+        $cartItems = Auth::check() && Auth::user()->cart ? Auth::user()->cart->items : collect();
+
+        return view('flashsale-detail', [
+            'flashSale' => $flashSale,
+            'items' => $items,
+            'cartItems' => $cartItems,
+            'search' => $request->input('search', ''),
+            'sort' => $sort,
+        ]);
+    }
 }
-
-

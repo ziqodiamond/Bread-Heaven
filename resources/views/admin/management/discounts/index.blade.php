@@ -78,7 +78,11 @@
                                     <span class="font-medium">Rp {{ number_format($product->price, 0, ',', '.') }}</span>
                                 </td>
                                 <td class="px-5 py-3">
-                                    <span class="text-red-600 font-medium">Rp {{ number_format($product->sale_price, 0, ',', '.') }}</span>
+                                    @if ($product->sale_price)
+                                        <span class="text-red-600 font-medium">Rp {{ number_format($product->sale_price, 0, ',', '.') }}</span>
+                                    @else
+                                        <span class="text-gray-400">-</span>
+                                    @endif
                                 </td>
                                 <td class="px-5 py-3">
                                     @if ($product->discount_label)

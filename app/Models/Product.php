@@ -649,6 +649,30 @@ class Product extends Model
             });
     }
 
+    /**
+     * Produk yang sedang flash sale aktif
+     *
+     * Cara pakai:
+     * Product::flashSaleActive()->get();
+     */
+    public function scopeFlashSaleActive($query)
+    {
+        return $query
+
+            ->whereHas(
+                'activeFlashSaleItem',
+                function ($subQuery) {
+                    $subQuery
+
+                        ->where('is_active', true)
+
+                        ->whereRaw(
+                            'sold_quantity < stock_limit'
+                        );
+                }
+            );
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Helper Methods

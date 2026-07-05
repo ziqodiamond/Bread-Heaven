@@ -32,6 +32,9 @@ Route::prefix('/')->group(function () {
     Route::get('/products', [GeneralController::class, 'products'])->name('products');
     Route::get('/product/{id}', [GeneralController::class, 'show'])->name('product.show');
     
+    // Flash Sale
+    Route::get('/flash-sale/{flashSale}', [GeneralController::class, 'flashSaleDetail'])->name('flashsale.show');
+    
     // Flash Sale API
     Route::get('/api/flash-sales/status', [GeneralController::class, 'getFlashSalesStatus'])->name('api.flash-sales.status');
 });

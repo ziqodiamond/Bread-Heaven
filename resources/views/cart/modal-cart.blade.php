@@ -63,7 +63,7 @@
                     {{-- Harga & Hapus --}}
                     <div class="flex items-center gap-3 flex-shrink-0">
                         <span class="text-sm font-medium text-gray-800 dark:text-gray-200">
-                            Rp {{ number_format($item->product->price ?? 0, 0, ',', '.') }}
+                            Rp {{ number_format($item->product->resolved_price ?? 0, 0, ',', '.') }}
                         </span>
                         {{-- Form hapus — tanpa AJAX, pakai POST biasa --}}
                         <form action="{{ route('cart.remove', $item->id) }}" method="POST">
@@ -95,7 +95,7 @@
                 <span class="text-xs text-gray-500 dark:text-gray-400">Subtotal</span>
                 <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
                     Rp
-                    {{ number_format($cartItems->sum(fn($i) => ($i->product->price ?? 0) * $i->quantity), 0, ',', '.') }}
+                    {{ number_format($cartItems->sum(fn($i) => ($i->product->resolved_price ?? 0) * $i->quantity), 0, ',', '.') }}
                 </span>
             </div>
         @endif

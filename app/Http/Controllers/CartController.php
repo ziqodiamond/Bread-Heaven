@@ -14,7 +14,7 @@ class CartController extends Controller
      */
     public function index()
     {
-        $cart = Cart::with('items.product')
+        $cart = Cart::with(['items.product.activeFlashSaleItem.flashSale'])
             ->firstOrCreate([
                 'user_id' => auth()->id(),
             ]);
@@ -27,7 +27,7 @@ class CartController extends Controller
      */
     public function show()
     {
-        $cart = Cart::with('items.product')
+        $cart = Cart::with(['items.product.activeFlashSaleItem.flashSale'])
             ->firstOrCreate([
                 'user_id' => auth()->id(),
             ]);

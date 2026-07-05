@@ -2,7 +2,20 @@
 {{-- Tidak ada x-data di sini — semua state dari productManager() --}}
 
 <form action="{{ route('admin.management.products.store') }}" method="POST" enctype="multipart/form-data"
-    class="space-y-5">
+    class="space-y-5"
+    x-data="{ discountEnabled: false }"
+    @submit="
+        const checkbox = document.querySelector('input[name=enable_discount]');
+        if (!checkbox.checked) {
+            document.getElementById('create_discount_type').value = '';
+            document.getElementById('create_discount_value').value = '';
+            document.getElementById('create_discount_label').value = '';
+            document.getElementById('create_discount_start').value = '';
+            document.getElementById('create_discount_end').value = '';
+            document.getElementById('create_sale_price').value = '';
+        }
+    ">
+
     @csrf
 
     {{-- ── Nama + Kategori ─────────────────────────────────────────── --}}
@@ -110,6 +123,17 @@
             </div>
             <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" name="enable_discount" value="1"
+                    @change="
+                        discountEnabled = $el.checked;
+                        if (!$el.checked) {
+                            document.getElementById('create_discount_type').value = '';
+                            document.getElementById('create_discount_value').value = '';
+                            document.getElementById('create_discount_label').value = '';
+                            document.getElementById('create_discount_start').value = '';
+                            document.getElementById('create_discount_end').value = '';
+                            document.getElementById('create_sale_price').value = '';
+                        }
+                    "
                     class="h-4 w-4 rounded border-gray-300">
                 <span class="text-xs font-medium text-gray-600">Aktifkan</span>
             </label>
@@ -122,6 +146,7 @@
             discountValueId: 'create_discount_value',
             discountInfoId: 'create_discount_info'
         })"
+        x-show="discountEnabled"
         class="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 py-3 bg-gray-50 rounded-xl">
             
             {{-- Tipe Diskon --}}
@@ -182,7 +207,7 @@
         </div>
 
         {{-- Jadwal Diskon --}}
-        <div class="mt-3">
+        <div class="mt-3" x-show="discountEnabled">
             <p class="text-xs font-medium text-gray-600 mb-2">Jadwal Diskon (Opsional)</p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1.5">

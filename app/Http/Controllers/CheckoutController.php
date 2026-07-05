@@ -35,7 +35,7 @@ class CheckoutController extends Controller
         /* ------------------------------------------------------------------ */
         if ($request->mode === 'buy_now') {
 
-            $product = Product::with('primaryImage')
+            $product = Product::with('primaryImage', 'activeFlashSaleItem.flashSale')
                 ->findOrFail($request->product_id);
 
             $quantity = max(1, (int) $request->quantity);
@@ -50,14 +50,14 @@ class CheckoutController extends Controller
                 (object) [
                     'product'           => $product,
                     'quantity'          => $quantity,
-                    'price'             => $product->price,
-                    'subtotal'          => $product->price * $quantity,
+                    'price'             => $product->resolved_price,
+                    'subtotal'          => $product->resolved_price * $quantity,
                     'total_weight'      => $product->weight * $quantity,
 
                     // alias untuk view
                     'product_name'      => $product->name,
                     'product_image_url' => $product->thumbnail,
-                    'product_price'     => $product->price,
+                    'product_price'     => $product->resolved_price,
                 ],
             ]);
 
@@ -72,7 +72,7 @@ class CheckoutController extends Controller
         } else {
 
             $cart = $user->cart()
-                ->with(['items.product.primaryImage'])
+                ->with(['items.product.primaryImage', 'items.product.activeFlashSaleItem.flashSale'])
                 ->first();
 
             abort_if(
@@ -141,6 +141,22 @@ class CheckoutController extends Controller
             'quantity'   => ['required', 'integer', 'min:1'],
         ]);
 
+        // Defensive checks: ensure product still available
+        $product = Product::find($validated['product_id']);
+
+        if (! $product) {
+            return redirect()->back()->with('error', 'Produk tidak ditemukan.');
+        }
+
+        if (! $product->is_available) {
+            return redirect()->back()->with('error', 'Produk tidak tersedia untuk dijual saat ini.');
+        }
+
+        if (! $product->hasEnoughStock($validated['quantity'])) {
+            return redirect()->back()->with('error', 'Stok tidak mencukupi untuk jumlah yang diminta.');
+        }
+
+        // Redirect ke checkout in buy_now mode
         return redirect()->route('checkout.index', [
             'mode'       => 'buy_now',
             'product_id' => $validated['product_id'],
@@ -397,6 +413,58 @@ class CheckoutController extends Controller
         $grandTotal     = $subtotal + $shippingFee + $serviceFee - $discountAmount;
 
         /* ------------------------------------------------------------------ */
+        /* Verifikasi perubahan harga / stok sebelum buat order                */
+        /* ------------------------------------------------------------------ */
+        $submittedPrices = $request->input('selected_prices', []);
+        $submittedQuantities = $request->input('selected_quantities', []);
+        $alerts = [];
+        $cartChanged = false;
+
+        foreach ($cart->items as $item) {
+
+            $fresh = Product::with('activeFlashSaleItem.flashSale')
+                ->find($item->product_id);
+
+            // Produk hilang dari sistem
+            if (! $fresh) {
+                $alerts[] = "Produk \"{$item->product_name}\" tidak tersedia lagi dan telah dihapus dari keranjang.";
+                $item->delete();
+                $cartChanged = true;
+                continue;
+            }
+
+            // Cek perubahan harga sejak halaman checkout dibuka
+            $submittedPrice = isset($submittedPrices[$item->product_id]) ? (int) $submittedPrices[$item->product_id] : $item->product_price;
+            $currentPrice = $fresh->resolved_price;
+
+            if ($submittedPrice !== $currentPrice) {
+                $alerts[] = "Harga untuk \"{$fresh->name}\" berubah dari Rp " . number_format($submittedPrice, 0, ',', '.') . " menjadi Rp " . number_format($currentPrice, 0, ',', '.');
+                $cartChanged = true;
+            }
+
+            // Cek stok
+            $submittedQty = isset($submittedQuantities[$item->product_id]) ? (int) $submittedQuantities[$item->product_id] : $item->quantity;
+
+            if (! $fresh->hasEnoughStock($submittedQty)) {
+                if ($fresh->stock > 0) {
+                    $item->update(['quantity' => $fresh->stock]);
+                    $alerts[] = "Stok untuk \"{$fresh->name}\" berkurang menjadi {$fresh->stock}. Jumlah keranjang telah disesuaikan.";
+                } else {
+                    $item->delete();
+                    $alerts[] = "Produk \"{$fresh->name}\" sudah habis dan telah dihapus dari keranjang.";
+                }
+                $cartChanged = true;
+            }
+        }
+
+        if ($cartChanged) {
+            // refresh cart dan kirim user kembali ke checkout dengan notifikasi
+            $cart = $user->cart()->with(['items.product'])->first();
+            session()->flash('checkout_alerts', $alerts);
+            return redirect()->route('checkout.index');
+        }
+
+        /* ------------------------------------------------------------------ */
         /* Buat Order                                                           */
         /* ------------------------------------------------------------------ */
         $order = Order::create([
@@ -451,6 +519,19 @@ class CheckoutController extends Controller
 
             $product = $item->product;
 
+            // Tentukan tipe diskon
+            $discountSource = 'none';
+            if ($product->is_flash_sale && $product->activeFlashSaleItem) {
+                $discountSource = 'flash_sale';
+            } elseif ($product->has_active_discount) {
+                $discountSource = 'product_discount';
+            }
+
+            // Hitung diskon
+            $originalPrice = $product->price;
+            $finalPrice = $product->resolved_price;
+            $discountPerItem = max(0, $originalPrice - $finalPrice);
+
             OrderItem::create([
                 'order_id'   => $order->id,
                 'product_id' => $product->id,
@@ -462,8 +543,13 @@ class CheckoutController extends Controller
                 'product_description' => $product->description,
                 'product_image_url'   => $product->thumbnail,
 
-                // Snapshot harga
-                'product_price' => $product->price,
+                // Snapshot harga — Prioritas: Flash Sale > Diskon > Harga Normal
+                'original_price'      => $originalPrice,
+                'product_price'       => $finalPrice,
+                'discount_amount'     => $discountPerItem,
+                'discount_percentage' => $originalPrice > 0 ? (int) round(($discountPerItem / $originalPrice) * 100) : 0,
+                'discount_label'      => $product->discount_label ?? null,
+                'discount_source'     => $discountSource,
 
                 // Quantity
                 'quantity' => $item->quantity,
@@ -473,7 +559,8 @@ class CheckoutController extends Controller
                 'total_weight'   => $item->total_weight,
 
                 // Total
-                'subtotal' => $item->subtotal,
+                'original_subtotal' => $originalPrice * $item->quantity,
+                'subtotal'          => $item->subtotal,
 
                 // Status
                 'status' => 'active',
@@ -629,6 +716,12 @@ class CheckoutController extends Controller
             /* STATIC RATES — Langsung dari ShippingMethod                     */
             /* -------------------------------------------------------------- */
             $staticRates = $staticMethods->map(function ($method) {
+                // Defensive: ensure $method is a ShippingMethod model
+                if (! $method || ! is_object($method)) {
+                    \Log::warning('CheckoutController::shippingRates - unexpected static shipping method type', ['method' => $method]);
+                    return null;
+                }
+
                 return [
                     /*
                     |--------------------------------------------------------------
@@ -650,7 +743,7 @@ class CheckoutController extends Controller
                     'etd'             => $method->estimated_delivery,
                     'features'        => [],
                 ];
-            })->values();
+            })->filter()->values();
 
             /* -------------------------------------------------------------- */
             /* DYNAMIC RATES — Dari Biteship API (cache)                       */
@@ -682,6 +775,12 @@ class CheckoutController extends Controller
                     $dynamicRates = collect($ratesResult['pricing'] ?? [])
                         ->map(function ($rate) use ($biteshipMethods) {
 
+                            // Defensive: ensure rate shape
+                            if (! is_array($rate)) {
+                                \Log::warning('CheckoutController::shippingRates - unexpected rate shape', ['rate' => $rate]);
+                                return null;
+                            }
+
                             /*
                             |--------------------------------------------------
                             | Cari ShippingMethod yang cocok
@@ -689,17 +788,22 @@ class CheckoutController extends Controller
                             |--------------------------------------------------
                             */
                             $shippingMethod = $biteshipMethods->first(function ($m) use ($rate) {
-                                return $m->courier_code === $rate['courier_code']
-                                    && $m->service_code === $rate['service_code'];
+                                // Defensive property access
+                                $mCourier = is_object($m) ? ($m->courier_code ?? null) : null;
+                                $mService = is_object($m) ? ($m->service_code ?? null) : null;
+
+                                return $mCourier === ($rate['courier_code'] ?? null)
+                                    && $mService === ($rate['service_code'] ?? null);
                             });
 
                             // Jika tidak ada di ShippingMethod → skip (eliminasi)
-                            if (! $shippingMethod) {
+                            if (! $shippingMethod || ! is_object($shippingMethod)) {
+                                \Log::warning('CheckoutController::shippingRates - shipping method not found for rate', ['rate' => $rate]);
                                 return null;
                             }
 
                             $additionalFee = $shippingMethod->additional_fee ?? 0;
-                            $finalPrice    = (int) $rate['price'] + $additionalFee;
+                            $finalPrice    = (int) ($rate['price'] ?? 0) + $additionalFee;
 
                             return [
                                 /*
@@ -710,16 +814,16 @@ class CheckoutController extends Controller
                                 */
                                 'id'              => $shippingMethod->id,
                                 'provider'        => 'biteship',
-                                'name'            => $rate['courier_company'] . ' - ' . $rate['courier_type'],
-                                'courier_company' => $rate['courier_company'],
-                                'courier_type'    => $rate['courier_type'],
-                                'courier_code'    => $rate['courier_code'],
-                                'service_code'    => $rate['service_code'],
+                                'name'            => ($rate['courier_company'] ?? '') . ' - ' . ($rate['courier_type'] ?? ''),
+                                'courier_company' => $rate['courier_company'] ?? '',
+                                'courier_type'    => $rate['courier_type'] ?? '',
+                                'courier_code'    => $rate['courier_code'] ?? '',
+                                'service_code'    => $rate['service_code'] ?? '',
                                 'service_type'    => $rate['service_type'] ?? '',
                                 'description'     => $rate['description'] ?? '',
                                 'price'           => $finalPrice,
                                 'price_formatted' => 'Rp ' . number_format($finalPrice, 0, ',', '.'),
-                                'etd'             => $rate['etd'],
+                                'etd'             => $rate['etd'] ?? '',
                                 'features'        => $rate['features'] ?? [],
                             ];
                         })
@@ -731,8 +835,9 @@ class CheckoutController extends Controller
             /* -------------------------------------------------------------- */
             /* Merge static + dynamic, sort by price                           */
             /* -------------------------------------------------------------- */
-            $rates = $staticRates
-                ->merge($dynamicRates)
+            // Ensure both collections are base Support collections before merging
+            $rates = collect($staticRates)
+                ->merge(collect($dynamicRates))
                 ->sortBy('price')
                 ->values();
 

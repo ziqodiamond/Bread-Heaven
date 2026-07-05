@@ -8,7 +8,19 @@
 --}}
 
 <form action="{{ route('admin.management.products.update', $product) }}" method="POST" enctype="multipart/form-data"
-    class="space-y-5">
+    class="space-y-5"
+    x-data="{ discountEnabled: {{ old('enable_discount', $product->sale_price ? 'true' : 'false') }} }"
+    @submit="
+        const checkbox = document.querySelector('input[name=enable_discount]');
+        if (!checkbox.checked) {
+            document.getElementById('edit_discount_type_{{ $product->id }}').value = '';
+            document.getElementById('edit_discount_value_{{ $product->id }}').value = '';
+            document.getElementById('edit_discount_label_{{ $product->id }}').value = '';
+            document.getElementById('edit_discount_start_{{ $product->id }}').value = '';
+            document.getElementById('edit_discount_end_{{ $product->id }}').value = '';
+            document.getElementById('edit_sale_price_{{ $product->id }}').value = '';
+        }
+    ">
 
     @csrf
     @method('PUT')
@@ -139,6 +151,17 @@
             <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" name="enable_discount" value="1" 
                     {{ old('enable_discount', $product->sale_price ? true : false) ? 'checked' : '' }}
+                    @change="
+                        discountEnabled = $el.checked;
+                        if (!$el.checked) {
+                            document.getElementById('edit_discount_type_{{ $product->id }}').value = '';
+                            document.getElementById('edit_discount_value_{{ $product->id }}').value = '';
+                            document.getElementById('edit_discount_label_{{ $product->id }}').value = '';
+                            document.getElementById('edit_discount_start_{{ $product->id }}').value = '';
+                            document.getElementById('edit_discount_end_{{ $product->id }}').value = '';
+                            document.getElementById('edit_sale_price_{{ $product->id }}').value = '';
+                        }
+                    "
                     class="h-4 w-4 rounded border-gray-300">
                 <span class="text-xs font-medium text-gray-600">Aktifkan</span>
             </label>
@@ -155,6 +178,7 @@
             initialType: '{{ $product->discount_type ?? '' }}',
             initialValue: {{ $product->discount_value ?? 'null' }}
         })"
+        x-show="discountEnabled"
         class="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 py-3 bg-gray-50 rounded-xl">
             
             {{-- Tipe Diskon --}}
@@ -218,7 +242,7 @@
         </div>
 
         {{-- Jadwal Diskon --}}
-        <div class="mt-3">
+        <div class="mt-3" x-show="discountEnabled">
             <p class="text-xs font-medium text-gray-600 mb-2">Jadwal Diskon (Opsional)</p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1.5">

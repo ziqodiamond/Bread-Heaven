@@ -45,9 +45,30 @@
                 @endif
 
                 {{-- Harga --}}
-                <p class="mt-5 text-2xl font-medium text-gray-900">
-                    Rp {{ number_format($product->price, 0, ',', '.') }}
-                </p>
+                <div class="mt-5">
+                    @if($product->is_flash_sale || $product->has_active_discount)
+                        <div class="flex items-baseline gap-3">
+                            <p class="text-2xl font-medium text-gray-900">
+                                Rp {{ number_format($product->resolved_price, 0, ',', '.') }}
+                            </p>
+                            <p class="text-sm text-gray-400 line-through">
+                                Rp {{ number_format($product->price, 0, ',', '.') }}
+                            </p>
+                        </div>
+                        <div class="mt-2">
+                            <span class="inline-block rounded-full bg-red-50 text-red-700 px-2 py-1 text-xs font-semibold">
+                                {{ $product->active_discount_type === 'flash_sale' ? 'Flash Sale' : 'Diskon' }}
+                                @if($product->discount_percentage)
+                                    - {{ $product->discount_percentage }}%
+                                @endif
+                            </span>
+                        </div>
+                    @else
+                        <p class="mt-1 text-2xl font-medium text-gray-900">
+                            Rp {{ number_format($product->price, 0, ',', '.') }}
+                        </p>
+                    @endif
+                </div>
 
                 {{-- Status stok --}}
                 <div class="mt-3 flex items-center gap-2">
@@ -89,7 +110,8 @@
                         open: false,
                         qty: 1,
                         stock: {{ $product->stock ?? 0 }},
-                        price: {{ $product->price }},
+                        price: {{ $product->resolved_price }},
+                        get displayPrice() { return this.price; },
                         get total() {
                             return 'Rp ' + (this.qty * this.price).toLocaleString('id-ID')
                         },
@@ -147,7 +169,12 @@
                                         <p class="text-sm font-medium text-gray-900 leading-snug">{{ $product->name }}
                                         </p>
                                         <p class="text-xs text-gray-500 mt-0.5">
-                                            Rp {{ number_format($product->price, 0, ',', '.') }}
+                                            @if($product->is_flash_sale || $product->has_active_discount)
+                                                <span class="font-semibold">Rp {{ number_format($product->resolved_price, 0, ',', '.') }}</span>
+                                                <span class="text-gray-400 line-through ml-2">Rp {{ number_format($product->price, 0, ',', '.') }}</span>
+                                            @else
+                                                Rp {{ number_format($product->price, 0, ',', '.') }}
+                                            @endif
                                         </p>
                                     </div>
                                 </div>
