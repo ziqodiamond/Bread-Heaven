@@ -141,6 +141,10 @@ class Voucher extends Model
         'allow_on_discount',
         'exclude_digital',
 
+        // Combination rules
+        'is_combinable',
+        'combination_type',
+
     ];
 
     /*
@@ -207,6 +211,9 @@ class Voucher extends Model
             'allow_on_flash_sale' => 'boolean',
             'allow_on_discount' => 'boolean',
             'exclude_digital' => 'boolean',
+
+            // Combination
+            'is_combinable' => 'boolean',
         ];
     }
 
@@ -270,6 +277,30 @@ class Voucher extends Model
             'voucher_id',
             'payment_method_id'
         )->withPivot('is_excluded');
+    }
+
+    /**
+     * Kombinasi voucher yang diizinkan dengan voucher ini
+     */
+    public function allowedCombinations()
+    {
+        return $this->hasMany(
+            VoucherCombination::class,
+            'voucher_a_id',
+            'id'
+        )->where('is_allowed', true);
+    }
+
+    /**
+     * Kombinasi voucher reverse
+     */
+    public function reverseCombinations()
+    {
+        return $this->hasMany(
+            VoucherCombination::class,
+            'voucher_b_id',
+            'id'
+        )->where('is_allowed', true);
     }
 
     /*
@@ -574,5 +605,63 @@ class Voucher extends Model
         $this->update([
             'status' => 'active',
         ]);
+    }
+
+    /**
+     * Validasi kombinasi dengan voucher lain
+     */
+    public function canCombineWith(Voucher $other): bool
+    {
+        // Both vouchers harus combinable
+        if (!$this->is_combinable || !$other->is_combinable) {
+            return false;
+        }
+
+        // Type check: tidak bisa combine diskon dengan potongan
+        if ($this->getCombinationType() === $other->getCombinationType()) {
+            // Same type tidak bisa dikombinasi
+            $thisType = $this->type;
+            $otherType = $other->type;
+
+            if ($thisType === 'free_shipping' && $otherType === 'free_shipping') {
+                return false; // Dua free shipping tidak boleh
+            }
+
+            if ($thisType !== 'free_shipping' && $otherType !== 'free_shipping') {
+                return false; // Dua diskon/potongan tidak boleh
+            }
+        }
+
+        // Check explicit rules
+        return $this->isAllowedCombination($other);
+    }
+
+    /**
+     * Get combination type (shipping vs discount)
+     */
+    public function getCombinationType(): string
+    {
+        if ($this->type === 'free_shipping') {
+            return 'shipping';
+        }
+
+        return 'discount'; // fixed atau percent
+    }
+
+    /**
+     * Check explicit allowed combination
+     */
+    private function isAllowedCombination(Voucher $other): bool
+    {
+        // Check both directions
+        $exists = VoucherCombination::where(function ($q) use ($other) {
+            $q->where('voucher_a_id', $this->id)
+              ->where('voucher_b_id', $other->id);
+        })->orWhere(function ($q) use ($other) {
+            $q->where('voucher_a_id', $other->id)
+              ->where('voucher_b_id', $this->id);
+        })->where('is_allowed', true)->exists();
+
+        return $exists;
     }
 }

@@ -131,6 +131,11 @@ class Order extends Model
         'voucher_value',
         'voucher_snapshot',
 
+        // Multiple vouchers
+        'vouchers',
+        'total_discount_amount',
+        'total_shipping_discount',
+
         /*
         |--------------------------------------------------------------------------
         | Informasi Discount
@@ -216,6 +221,11 @@ class Order extends Model
 
             'voucher_value' => 'integer',
             'voucher_snapshot' => 'array',
+
+            // Multiple vouchers
+            'vouchers' => 'array',
+            'total_discount_amount' => 'integer',
+            'total_shipping_discount' => 'integer',
 
             /*
             |--------------------------------------------------------------------------

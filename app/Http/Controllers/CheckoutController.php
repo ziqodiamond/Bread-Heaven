@@ -86,6 +86,12 @@ class CheckoutController extends Controller
             $checkoutMode = 'cart';
         }
 
+        // Get applied vouchers
+        $appliedVouchers = [];
+        if (isset($cart->vouchers) && is_array($cart->vouchers)) {
+            $appliedVouchers = $cart->vouchers;
+        }
+
         /* ------------------------------------------------------------------ */
         /* Alamat user (aktif)                                                  */
         /* ------------------------------------------------------------------ */
@@ -125,6 +131,7 @@ class CheckoutController extends Controller
             'subtotal',
             'totalWeight',
             'checkoutMode',
+            'appliedVouchers',
         ));
     }
 
@@ -411,21 +418,36 @@ class CheckoutController extends Controller
         $serviceFee     = $paymentMethod->calculateFee($subtotal + $shippingFee);
         $discountAmount = 0;
         $shippingDiscount = 0;
+        $appliedVouchers = [];
 
-        // Jika ada voucher di cart, validasi ulang saat user submit order
-        if (!empty($cart->voucher_code)) {
+        // Handle multiple vouchers di cart
+        if (!empty($cart->vouchers) && is_array($cart->vouchers)) {
             $voucherService = app(\App\Services\VoucherService::class);
-
+            
             try {
-                $vResult = $voucherService->validate($cart, $cart->voucher_code);
-
-                $discountAmount = $vResult['discount_amount'] ?? 0;
-                $shippingDiscount = $vResult['shipping_discount'] ?? 0;
-
-            } catch (\Illuminate\Validation\ValidationException $e) {
+                // Validasi ulang semua voucher saat user submit order
+                foreach ($cart->vouchers as $voucherData) {
+                    if (isset($voucherData['id'])) {
+                        $voucher = \App\Models\Voucher::find($voucherData['id']);
+                        
+                        if ($voucher) {
+                            // Re-validate voucher
+                            $validationRules = $voucherService->validateQuotaAndRules($voucher, $cart, $user);
+                            
+                            if (!$validationRules['valid']) {
+                                throw new \Exception($validationRules['message']);
+                            }
+                            
+                            // Accumulate discounts
+                            $discountAmount += $voucherData['discount_amount'] ?? 0;
+                            $shippingDiscount += $voucherData['shipping_discount'] ?? 0;
+                            $appliedVouchers[] = $voucherData;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
                 // Jika voucher tidak valid saat submit order → kembalikan user ke checkout
-                $message = collect($e->errors())->flatten()->first() ?? 'Voucher tidak valid.';
-                session()->flash('checkout_alerts', [$message]);
+                session()->flash('checkout_alerts', [$e->getMessage()]);
                 return redirect()->route('checkout.index');
             }
         }
@@ -524,12 +546,10 @@ class CheckoutController extends Controller
             'final_shipping_cost' => $finalShippingCost,
             'grand_total'     => $grandTotal,
 
-            // Voucher snapshot (jika ada)
-            'voucher_code'    => $cart->voucher_code,
-            'voucher_name'    => $cart->voucher_name,
-            'voucher_type'    => $cart->voucher_snapshot['type'] ?? null,
-            'voucher_value'   => $cart->voucher_snapshot['value'] ?? null,
-            'voucher_snapshot' => $cart->voucher_snapshot ?? null,
+            // Multiple vouchers snapshot
+            'vouchers' => $appliedVouchers,
+            'total_discount_amount' => $discountAmount,
+            'total_shipping_discount' => $shippingDiscount,
 
             // Berat
             'total_weight' => $totalWeight,
@@ -642,23 +662,26 @@ class CheckoutController extends Controller
         }
 
         /* ------------------------------------------------------------------ */
-        /* Buat VoucherUsage (snapshot) jika ada voucher                         */
+        /* Buat VoucherUsage (snapshot) untuk setiap voucher yang dipakai        */
         /* ------------------------------------------------------------------ */
-        if (! empty($cart->voucher_code)) {
+        if (!empty($appliedVouchers) && is_array($appliedVouchers)) {
             try {
                 $voucherService = app(\App\Services\VoucherService::class);
-                $voucher = \App\Models\Voucher::where('code', $cart->voucher_code)->first();
-
-                if ($voucher) {
-                    $voucherService->applyVoucherToOrder($voucher, [
-                        'user_id' => $user->id,
-                        'order_id' => $order->id,
-                        'discount_amount' => $discountAmount,
-                        'shipping_discount' => $shippingDiscount,
-                        'invoice_number' => $order->invoice_number,
-                        'order_subtotal' => $order->subtotal,
-                        'order_grand_total' => $order->grand_total,
-                    ]);
+                
+                foreach ($appliedVouchers as $voucherData) {
+                    if (isset($voucherData['id'])) {
+                        $voucher = \App\Models\Voucher::find($voucherData['id']);
+                        
+                        if ($voucher) {
+                            $voucherService->applyVouchersToOrder([
+                                'voucher' => $voucher,
+                                'order' => $order,
+                                'user' => $user,
+                                'discount_amount' => $voucherData['discount_amount'] ?? 0,
+                                'shipping_discount' => $voucherData['shipping_discount'] ?? 0,
+                            ]);
+                        }
+                    }
                 }
             } catch (\Exception $e) {
                 \Log::warning('CheckoutController::VoucherUsage failed', ['error' => $e->getMessage()]);

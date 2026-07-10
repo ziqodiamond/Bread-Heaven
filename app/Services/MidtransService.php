@@ -131,7 +131,17 @@ class MidtransService
                     'id'       => 'discount',
                     'price'    => - ((int) $order->discount_amount),
                     'quantity' => 1,
-                    'name'     => 'Diskon',
+                    'name'     => 'Diskon Voucher',
+                ];
+            }
+
+            // Tambah diskon ongkir jika ada
+            if ($order->shipping_discount > 0) {
+                $itemDetails[] = [
+                    'id'       => 'shipping_discount',
+                    'price'    => - ((int) $order->shipping_discount),
+                    'quantity' => 1,
+                    'name'     => 'Diskon Ongkir',
                 ];
             }
 
@@ -150,7 +160,14 @@ class MidtransService
                     'unfinish' => route('payment.unfinish', $order->id),
                     'error'    => route('payment.error', $order->id),
                 ],
+                'custom_field1' => 'Order: ' . $order->invoice_number,
             ];
+
+            // Add voucher details sebagai custom field jika ada
+            if (!empty($order->vouchers) && is_array($order->vouchers)) {
+                $voucherCodes = array_column($order->vouchers, 'code');
+                $snapPayload['custom_field2'] = 'Vouchers: ' . implode(', ', $voucherCodes);
+            }
 
             // Hanya set enabled_payments jika ada isinya
             if (!empty($enabledPayments)) {

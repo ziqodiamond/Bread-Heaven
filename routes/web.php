@@ -7,7 +7,7 @@ use App\Http\Controllers\Admin\AdminShipmentController;
 use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\DiscountController;
 use App\Http\Controllers\Admin\FlashSaleController;
-use App\Http\Controllers\Admin\VoucherController;
+use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CartController;
@@ -21,6 +21,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShippingMethodController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\Usercontroller;
 use App\Http\Middleware\AdminMiddleware;
 use Illuminate\Support\Facades\Route;
@@ -67,6 +68,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/add', [CartController::class, 'add'])->name('add');
         Route::put('/update/{cartItem}', [CartController::class, 'update'])->name('update');
         Route::delete('/remove/{cartItem}', [CartController::class, 'removeItem'])->name('remove');
+
+        // Voucher routes
+        Route::prefix('/vouchers')->name('vouchers.')->group(function () {
+            Route::post('/add', [VoucherController::class, 'add'])->name('add');
+            Route::post('/remove', [VoucherController::class, 'remove'])->name('remove');
+            Route::get('/available', [VoucherController::class, 'available'])->name('available');
+            Route::get('/current', [VoucherController::class, 'current'])->name('current');
+            Route::post('/validate', [VoucherController::class, 'validate'])->name('validate');
+            Route::post('/clear', [VoucherController::class, 'clear'])->name('clear');
+        });
     });
 
     Route::prefix('/checkout')->name('checkout.')->group(function () {
@@ -146,13 +157,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:ad
 
         // Voucher Management
         Route::prefix('vouchers')->name('vouchers.')->group(function () {
-            Route::get('/', [VoucherController::class, 'index'])->name('index');
-            Route::get('/create', [VoucherController::class, 'create'])->name('create');
-            Route::post('/', [VoucherController::class, 'store'])->name('store');
-            Route::get('/{voucher}/edit', [VoucherController::class, 'edit'])->name('edit');
-            Route::put('/{voucher}', [VoucherController::class, 'update'])->name('update');
-            Route::delete('/{voucher}', [VoucherController::class, 'destroy'])->name('destroy');
-            Route::post('/generate-code', [VoucherController::class, 'generateCode'])->name('generateCode');
+            Route::get('/', [AdminVoucherController::class, 'index'])->name('index');
+            Route::get('/create', [AdminVoucherController::class, 'create'])->name('create');
+            Route::post('/', [AdminVoucherController::class, 'store'])->name('store');
+            Route::get('/{voucher}/edit', [AdminVoucherController::class, 'edit'])->name('edit');
+            Route::put('/{voucher}', [AdminVoucherController::class, 'update'])->name('update');
+            Route::delete('/{voucher}', [AdminVoucherController::class, 'destroy'])->name('destroy');
+            Route::post('/generate-code', [AdminVoucherController::class, 'generateCode'])->name('generateCode');
         });
 
         Route::prefix('users')->name('users.')->group(function () {

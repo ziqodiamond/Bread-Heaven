@@ -1009,6 +1009,22 @@
                         </div>
                     </div>
 
+                    {{-- VOUCHER & PROMO --}}
+                    <div class="section-card">
+                        <div class="section-header">
+                            <div class="flex items-center gap-3">
+                                <div class="step-num" x-text="deliveryMode === 'pickup' ? '3' : '4'"></div>
+                                <h2>Voucher & Promo</h2>
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            <x-checkout-voucher-section 
+                                :appliedVouchers="$appliedVouchers ?? []"
+                                :subtotal="$subtotal ?? 0"
+                            />
+                        </div>
+                    </div>
+
                     {{-- CATATAN --}}
                     <div class="section-card">
                         <div class="section-header">
@@ -1086,6 +1102,21 @@
                                         class="text-gray-900 dark:text-white" x-text="formatRp(shippingPrice)"></span>
                                 </span>
                             </div>
+
+                            <!-- Voucher Discount Display -->
+                            @php
+                                $totalDiscount = ($cart->total_discount_amount ?? 0) + ($cart->total_shipping_discount ?? 0);
+                            @endphp
+
+                            @if ($totalDiscount > 0)
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-sm text-gray-400">Diskon Voucher</span>
+                                    <span class="text-sm font-medium text-green-600 dark:text-green-400">
+                                        -Rp {{ number_format($totalDiscount, 0, ',', '.') }}
+                                    </span>
+                                </div>
+                            @endif
+
                             <div class="flex items-center justify-between mb-3" x-show="paymentFee > 0">
                                 <span class="text-sm text-gray-400">Biaya Layanan</span>
                                 <span class="text-sm font-medium text-amber-500" x-text="formatRp(paymentFee)"></span>

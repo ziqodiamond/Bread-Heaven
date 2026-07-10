@@ -131,8 +131,17 @@
                     <!-- Summary -->
                     <div class="mt-6 w-full lg:mt-0 lg:w-1/3">
 
+                        <!-- Voucher Section -->
+                        <x-voucher-section 
+                            :appliedVouchers="$cart->getAppliedVouchers()"
+                            :cartSummary="[
+                                'total_discount' => $cart->total_discount_amount ?? 0,
+                                'total_shipping_discount' => $cart->total_shipping_discount ?? 0,
+                            ]"
+                        />
+
                         <div
-                            class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                            class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 mt-6">
 
                             <h3 class="text-xl font-bold text-gray-900 dark:text-white">
                                 Order Summary
@@ -160,6 +169,18 @@
                                     </span>
                                 </div>
 
+                                @if ($cart->total_discount_amount > 0)
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-gray-500 dark:text-gray-400">
+                                            Diskon
+                                        </span>
+
+                                        <span class="font-medium text-green-600 dark:text-green-400">
+                                            -Rp{{ number_format($cart->total_discount_amount, 0, ',', '.') }}
+                                        </span>
+                                    </div>
+                                @endif
+
                                 <div class="border-t border-gray-200 pt-4 dark:border-gray-700">
 
                                     <div class="flex items-center justify-between">
@@ -169,7 +190,7 @@
                                         </span>
 
                                         <span class="text-xl font-bold text-gray-900 dark:text-white">
-                                            Rp{{ number_format($cart->subtotal, 0, ',', '.') }}
+                                            Rp{{ number_format($cart->final_subtotal ?? $cart->subtotal - ($cart->total_discount_amount ?? 0), 0, ',', '.') }}
                                         </span>
                                     </div>
                                 </div>

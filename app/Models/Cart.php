@@ -86,6 +86,11 @@ class Cart extends Model
         'voucher_name',
         'voucher_snapshot',
 
+        // Multiple vouchers
+        'vouchers',
+        'total_discount_amount',
+        'total_shipping_discount',
+
         /*
         |--------------------------------------------------------------------------
         | Expired Cart
@@ -114,6 +119,8 @@ class Cart extends Model
             'subtotal' => 'integer',
             'discount_amount' => 'integer',
             'final_subtotal' => 'integer',
+            'total_discount_amount' => 'integer',
+            'total_shipping_discount' => 'integer',
 
             /*
             |--------------------------------------------------------------------------
@@ -123,6 +130,7 @@ class Cart extends Model
 
             'expired_at' => 'datetime',
             'voucher_snapshot' => 'array',
+            'vouchers' => 'array',
         ];
     }
 
@@ -249,8 +257,39 @@ class Cart extends Model
             'voucher_name' => null,
 
             'discount_amount' => 0,
+
+            // Multiple vouchers
+            'vouchers' => null,
+            'total_discount_amount' => 0,
+            'total_shipping_discount' => 0,
         ]);
 
         $this->refreshCartSummary();
+    }
+
+    /**
+     * Get applied vouchers
+     */
+    public function getAppliedVouchers()
+    {
+        $vouchers = $this->vouchers ?? [];
+        
+        if (empty($vouchers)) {
+            return collect();
+        }
+
+        return Voucher::whereIn('id', array_column($vouchers, 'id'))->get()->map(function ($v) use ($vouchers) {
+            $voucherData = collect($vouchers)->firstWhere('id', $v->id);
+            return (object) array_merge($v->toArray(), $voucherData ?? []);
+        });
+    }
+
+    /**
+     * Check if can add voucher (max 2)
+     */
+    public function canAddMoreVouchers(): bool
+    {
+        $count = count($this->vouchers ?? []);
+        return $count < 2;
     }
 }

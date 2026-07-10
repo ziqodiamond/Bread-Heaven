@@ -5,112 +5,323 @@ namespace App\Services;
 use App\Models\Cart;
 use App\Models\Voucher;
 use App\Models\VoucherUsage;
+use App\Models\VoucherCombination;
 use App\Models\Product;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Service terpusat untuk validasi dan perhitungan voucher
- * Semua logic validasi berada di sini agar tidak tersebar di Controller/Model
+ * Enhanced Voucher Service dengan dukungan kombinasi voucher
+ * 
+ * Rules:
+ * - Max 2 voucher per cart
+ * - Harus berbeda type (shipping vs discount)
+ * - Tidak bisa 2x diskon atau 2x free_shipping
+ * - Voucher A dan B harus both is_combinable = true
+ * - Cek explicit allowed combinations di voucher_combinations table
  */
 class VoucherService
 {
     /**
-     * Validasi voucher untuk cart.
-     * Mengembalikan array berisi: success, message, discount_amount, shipping_discount, voucher
+     * Validasi dan tambah voucher ke cart
      */
-    public function validate(Cart $cart, string $voucherCode): array
+    public function addVoucher(Cart $cart, string $voucherCode): array
     {
-        // Cari voucher yang valid (aktif & jadwal)
+        try {
+            $voucher = $this->findAndValidateVoucher($voucherCode);
+
+            // Cek apakah voucher sudah diaplikasikan
+            $currentVouchers = $cart->vouchers ?? [];
+            if ($this->voucherAlreadyApplied($voucher->id, $currentVouchers)) {
+                throw ValidationException::withMessages([
+                    'voucher' => 'Voucher ini sudah diaplikasikan pada keranjang.'
+                ]);
+            }
+
+            // Cek batas jumlah voucher (max 2)
+            if (count($currentVouchers) >= 2) {
+                throw ValidationException::withMessages([
+                    'voucher' => 'Maksimal 2 voucher dapat digunakan. Silakan hapus voucher lain terlebih dahulu.'
+                ]);
+            }
+
+            // Jika sudah ada 1 voucher, cek kombinasi
+            if (count($currentVouchers) > 0) {
+                $existingVoucher = Voucher::find($currentVouchers[0]['id']);
+                $this->validateCombination($existingVoucher, $voucher);
+            }
+
+            // Validasi kuota dan rules
+            $this->validateQuotaAndRules($voucher, $cart);
+
+            // Hitung discount
+            $discountData = $this->calculateVoucherDiscount($voucher, $cart);
+
+            // Tambahkan ke array vouchers
+            $newVouchers = $currentVouchers;
+            $newVouchers[] = [
+                'id' => $voucher->id,
+                'code' => $voucher->code,
+                'name' => $voucher->name,
+                'type' => $voucher->type,
+                'discount_amount' => $discountData['discount_amount'],
+                'shipping_discount' => $discountData['shipping_discount'],
+                'value' => $voucher->value,
+            ];
+
+            // Update cart dengan semua vouchers
+            $this->updateCartVouchers($cart, $newVouchers);
+
+            return [
+                'success' => true,
+                'message' => "Voucher '{$voucher->name}' berhasil diterapkan.",
+                'voucher' => $voucher,
+                'discount_data' => $discountData,
+            ];
+
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            throw ValidationException::withMessages([
+                'voucher' => $e->getMessage() ?: 'Terjadi kesalahan saat menerapkan voucher.'
+            ]);
+        }
+    }
+
+    /**
+     * Hapus voucher dari cart
+     */
+    public function removeVoucher(Cart $cart, string $voucherId): array
+    {
+        $currentVouchers = $cart->vouchers ?? [];
+        $newVouchers = array_filter(
+            $currentVouchers,
+            fn($v) => $v['id'] !== $voucherId
+        );
+
+        $this->updateCartVouchers($cart, array_values($newVouchers));
+
+        return [
+            'success' => true,
+            'message' => 'Voucher berhasil dihapus.',
+        ];
+    }
+
+    /**
+     * Cari dan validasi voucher
+     */
+    private function findAndValidateVoucher(string $voucherCode): Voucher
+    {
         $voucher = Voucher::query()
             ->valid()
             ->where('code', strtoupper($voucherCode))
             ->first();
 
         if (!$voucher) {
-            throw ValidationException::withMessages(['voucher' => 'Voucher tidak valid.']);
+            throw ValidationException::withMessages([
+                'voucher' => 'Voucher tidak valid atau tidak tersedia.'
+            ]);
         }
 
-        // Urutan validasi sesuai requirement
-        // 1. Aktif
         if (!$voucher->is_running) {
-            throw ValidationException::withMessages(['voucher' => 'Voucher tidak aktif atau berada diluar jadwal.']);
+            throw ValidationException::withMessages([
+                'voucher' => 'Voucher tidak aktif atau berada di luar jadwal.'
+            ]);
         }
 
-        // 2. Belum expired
         if ($voucher->is_expired) {
-            throw ValidationException::withMessages(['voucher' => 'Voucher sudah kadaluarsa.']);
+            throw ValidationException::withMessages([
+                'voucher' => 'Voucher sudah kadaluarsa.'
+            ]);
         }
 
-        // 3. Kuota tersedia
+        return $voucher;
+    }
+
+    /**
+     * Cek apakah voucher sudah diaplikasikan
+     */
+    private function voucherAlreadyApplied(string $voucherId, array $currentVouchers): bool
+    {
+        return !empty(array_filter(
+            $currentVouchers,
+            fn($v) => $v['id'] === $voucherId
+        ));
+    }
+
+    /**
+     * Validasi kombinasi dua voucher
+     * 
+     * Rules:
+     * - Both harus is_combinable = true
+     * - Harus berbeda type (shipping vs discount)
+     * - Cek explicit allowed combinations
+     */
+    private function validateCombination(Voucher $existing, Voucher $new): void
+    {
+        // Cek is_combinable pada kedua voucher
+        if (!$existing->is_combinable || !$new->is_combinable) {
+            throw ValidationException::withMessages([
+                'voucher' => 'Salah satu atau kedua voucher ini tidak dapat dikombinasikan dengan voucher lain.'
+            ]);
+        }
+
+        // Cek type - tidak boleh sama
+        $existingType = $existing->getCombinationType();
+        $newType = $new->getCombinationType();
+
+        if ($existingType === $newType) {
+            throw ValidationException::withMessages([
+                'voucher' => 'Tidak dapat menggabungkan dua voucher dengan tipe sama. Pilih satu voucher untuk diskon dan satu untuk gratis ongkir.'
+            ]);
+        }
+
+        // Cek explicit allowed combinations
+        if (!$this->isExplicitlyAllowed($existing, $new)) {
+            throw ValidationException::withMessages([
+                'voucher' => "Voucher '{$new->name}' tidak dapat dikombinasikan dengan '{$existing->name}'."
+            ]);
+        }
+    }
+
+    /**
+     * Cek explicit allowed combination di database
+     */
+    private function isExplicitlyAllowed(Voucher $v1, Voucher $v2): bool
+    {
+        // Cek kedua arah
+        $exists = VoucherCombination::where(function ($q) use ($v1, $v2) {
+            $q->where('voucher_a_id', $v1->id)
+              ->where('voucher_b_id', $v2->id);
+        })->orWhere(function ($q) use ($v1, $v2) {
+            $q->where('voucher_a_id', $v2->id)
+              ->where('voucher_b_id', $v1->id);
+        })->where('is_allowed', true)->exists();
+
+        return $exists;
+    }
+
+    /**
+     * Validasi kuota dan rules voucher
+     */
+    private function validateQuotaAndRules(Voucher $voucher, Cart $cart): void
+    {
+        // 1. Kuota
         if (!$this->validateQuota($voucher)) {
-            throw ValidationException::withMessages(['voucher' => 'Kuota voucher sudah habis.']);
+            throw ValidationException::withMessages([
+                'voucher' => 'Kuota voucher sudah habis. Gunakan voucher lain.'
+            ]);
         }
 
-        // 4. User memenuhi syarat
+        // 2. User
         if (!$this->validateUser($voucher, $cart->user)) {
-            throw ValidationException::withMessages(['voucher' => 'Anda tidak memenuhi syarat untuk voucher ini.']);
+            throw ValidationException::withMessages([
+                'voucher' => 'Anda tidak memenuhi syarat untuk voucher ini.'
+            ]);
         }
 
-        // 5. Limit per user
+        // 3. Usage limit per user
         if (!$this->validateUserUsageLimit($voucher, $cart->user)) {
-            throw ValidationException::withMessages(['voucher' => 'Anda sudah mencapai batas penggunaan voucher ini.']);
+            throw ValidationException::withMessages([
+                'voucher' => 'Anda sudah mencapai batas penggunaan voucher ini.'
+            ]);
         }
 
-        // 6. Minimum pembelian
+        // 4. Minimum purchase
         if (!$this->validateMinimumPurchase($voucher, $cart->subtotal)) {
-            throw ValidationException::withMessages(['voucher' => 'Minimum pembelian belum tercapai.']);
+            $formatted = 'Rp' . number_format($voucher->minimum_purchase, 0, ',', '.');
+            throw ValidationException::withMessages([
+                'voucher' => "Minimum pembelian belum tercapai. Minimum: {$formatted}"
+            ]);
         }
 
-        // 7-9. Produk / Kategori / Brand
+        // 5. Products
         if (!$this->validateProducts($voucher, $cart->items)) {
-            throw ValidationException::withMessages(['voucher' => 'Voucher tidak berlaku untuk produk/varian yang ada di keranjang.']);
+            throw ValidationException::withMessages([
+                'voucher' => 'Voucher tidak berlaku untuk produk di keranjang.'
+            ]);
         }
 
+        // 6. Categories
         if (!$this->validateCategories($voucher, $cart->items)) {
-            throw ValidationException::withMessages(['voucher' => 'Voucher tidak berlaku untuk kategori produk di keranjang.']);
+            throw ValidationException::withMessages([
+                'voucher' => 'Voucher tidak berlaku untuk kategori produk di keranjang.'
+            ]);
         }
 
-        if (!$this->validateBrands($voucher, $cart->items)) {
-            throw ValidationException::withMessages(['voucher' => 'Voucher tidak berlaku untuk brand produk di keranjang.']);
+        // 7. Shipping methods (jika ada)
+        if ($cart->selected_shipping_method && !$this->validateShipping($voucher, $cart->selected_shipping_method)) {
+            throw ValidationException::withMessages([
+                'voucher' => 'Voucher tidak berlaku untuk metode pengiriman ini.'
+            ]);
         }
 
-        // 10. Shipping
-        if (!$this->validateShipping($voucher, $cart->selected_shipping_method ?? null)) {
-            throw ValidationException::withMessages(['voucher' => 'Voucher tidak berlaku untuk metode pengiriman ini.']);
+        // 8. Payment methods (jika ada)
+        if ($cart->selected_payment_method && !$this->validatePayment($voucher, $cart->selected_payment_method)) {
+            throw ValidationException::withMessages([
+                'voucher' => 'Voucher tidak berlaku untuk metode pembayaran ini.'
+            ]);
         }
 
-        // 11. Payment
-        if (!$this->validatePayment($voucher, $cart->selected_payment_method ?? null)) {
-            throw ValidationException::withMessages(['voucher' => 'Voucher tidak berlaku untuk metode pembayaran ini.']);
-        }
-
-        // 12. Flash Sale
+        // 9. Flash sale
         if (!$this->validateFlashSale($voucher, $cart->items)) {
-            throw ValidationException::withMessages(['voucher' => 'Voucher tidak dapat digunakan bersamaan dengan Flash Sale.']);
+            throw ValidationException::withMessages([
+                'voucher' => 'Voucher tidak dapat digunakan untuk produk flash sale.'
+            ]);
         }
 
-        // 13. Discount (produk diskon)
+        // 10. Discount products
         if (!$this->validateDiscount($voucher, $cart->items)) {
-            throw ValidationException::withMessages(['voucher' => 'Voucher tidak dapat digunakan untuk produk yang sedang diskon.']);
+            throw ValidationException::withMessages([
+                'voucher' => 'Voucher tidak dapat digunakan untuk produk yang sedang diskon.'
+            ]);
         }
+    }
 
-        // Hitung diskon
+    /**
+     * Hitung discount dari satu voucher
+     */
+    private function calculateVoucherDiscount(Voucher $voucher, Cart $cart): array
+    {
         $shippingCost = $cart->shipping_cost ?? 0;
-        $discountAmount = $this->calculateDiscount($voucher, $cart->subtotal, $shippingCost);
+        $discountAmount = $voucher->calculateDiscount($cart->subtotal, $shippingCost);
+        $shippingDiscount = $voucher->type === 'free_shipping' ? min($shippingCost, $discountAmount) : 0;
 
         return [
-            'success' => true,
-            'message' => 'Voucher valid.',
-            'voucher' => $voucher,
             'discount_amount' => $discountAmount,
-            'shipping_discount' => $voucher->type === 'free_shipping' ? min($shippingCost, $discountAmount) : 0,
+            'shipping_discount' => $shippingDiscount,
         ];
     }
 
     /**
-     * Cek kuota voucher
+     * Update cart dengan semua vouchers dan recalculate total
+     */
+    private function updateCartVouchers(Cart $cart, array $newVouchers): void
+    {
+        // Calculate totals
+        $totalDiscountAmount = 0;
+        $totalShippingDiscount = 0;
+
+        foreach ($newVouchers as $vData) {
+            $totalDiscountAmount += $vData['discount_amount'] ?? 0;
+            $totalShippingDiscount += $vData['shipping_discount'] ?? 0;
+        }
+
+        // Update cart
+        $cart->update([
+            'vouchers' => $newVouchers,
+            'total_discount_amount' => $totalDiscountAmount,
+            'total_shipping_discount' => $totalShippingDiscount,
+            'discount_amount' => $totalDiscountAmount,
+        ]);
+
+        // Refresh summary
+        $cart->refreshCartSummary();
+    }
+
+    /**
+     * Validasi kuota voucher
      */
     public function validateQuota(Voucher $voucher): bool
     {
@@ -118,8 +329,7 @@ class VoucherService
     }
 
     /**
-     * Validasi user (all/new/member)
-     * Untuk pengembangan, gunakan kolom members_only dan additional rules
+     * Validasi user (members only, etc)
      */
     public function validateUser(Voucher $voucher, $user = null): bool
     {
@@ -127,12 +337,11 @@ class VoucherService
             return $user !== null;
         }
 
-        // Default: semua user boleh
         return true;
     }
 
     /**
-     * Validasi batas pemakaian per user
+     * Validasi batas penggunaan per user
      */
     public function validateUserUsageLimit(Voucher $voucher, $user = null): bool
     {
@@ -140,9 +349,13 @@ class VoucherService
             return true;
         }
 
-        $count = VoucherUsage::query()->where('voucher_id', $voucher->id)->where('user_id', $user->id)->count();
+        $count = VoucherUsage::query()
+            ->where('voucher_id', $voucher->id)
+            ->where('user_id', $user->id)
+            ->where('status', 'used')
+            ->count();
 
-        return $count < $voucher->max_usage_per_user;
+        return $count < ($voucher->max_usage_per_user ?? 1);
     }
 
     /**
@@ -150,15 +363,14 @@ class VoucherService
      */
     public function validateMinimumPurchase(Voucher $voucher, int $subtotal): bool
     {
-        return $subtotal >= $voucher->minimum_purchase;
+        return $subtotal >= ($voucher->minimum_purchase ?? 0);
     }
 
     /**
-     * Validasi produk — tangent inclusion/exclusion
+     * Validasi produk
      */
     public function validateProducts(Voucher $voucher, $cartItems): bool
     {
-        // Jika voucher tidak meng-include product list (artinya berlaku untuk semua), check excludes only
         $included = $voucher->products()->wherePivot('is_excluded', false)->pluck('id')->toArray();
         $excluded = $voucher->products()->wherePivot('is_excluded', true)->pluck('id')->toArray();
 
@@ -166,12 +378,10 @@ class VoucherService
             $productId = $item->product_id ?? ($item->product->id ?? null);
             if (!$productId) continue;
 
-            // Jika ada included list dan product tidak ada di included -> invalid
             if (!empty($included) && !in_array($productId, $included, true)) {
                 return false;
             }
 
-            // Jika product ada di excluded -> invalid
             if (!empty($excluded) && in_array($productId, $excluded, true)) {
                 return false;
             }
@@ -212,38 +422,7 @@ class VoucherService
     }
 
     /**
-     * Validasi brand
-     */
-    public function validateBrands(Voucher $voucher, $cartItems): bool
-    {
-        $included = $voucher->brands()->wherePivot('is_excluded', false)->pluck('id')->toArray();
-        $excluded = $voucher->brands()->wherePivot('is_excluded', true)->pluck('id')->toArray();
-
-        if (empty($included) && empty($excluded)) {
-            return true;
-        }
-
-        foreach ($cartItems as $item) {
-            $product = $item->product ?? null;
-            if (!$product) continue;
-
-            $brandId = $product->brand_id ?? null;
-            if (!$brandId) continue;
-
-            if (!empty($included) && !in_array($brandId, $included, true)) {
-                return false;
-            }
-
-            if (!empty($excluded) && in_array($brandId, $excluded, true)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Validasi metode pengiriman
+     * Validasi shipping method
      */
     public function validateShipping(Voucher $voucher, $shippingMethod = null): bool
     {
@@ -266,7 +445,7 @@ class VoucherService
     }
 
     /**
-     * Validasi metode pembayaran
+     * Validasi payment method
      */
     public function validatePayment(Voucher $voucher, $paymentMethod = null): bool
     {
@@ -289,11 +468,10 @@ class VoucherService
     }
 
     /**
-     * Validasi rule flash sale
+     * Validasi flash sale
      */
     public function validateFlashSale(Voucher $voucher, $cartItems): bool
     {
-        // Jika voucher mengizinkan penggunaan pada flash sale, ok
         if ($voucher->allow_on_flash_sale) {
             return true;
         }
@@ -311,7 +489,7 @@ class VoucherService
     }
 
     /**
-     * Validasi rule produk diskon
+     * Validasi discount
      */
     public function validateDiscount(Voucher $voucher, $cartItems): bool
     {
@@ -332,36 +510,85 @@ class VoucherService
     }
 
     /**
-     * Hitung nominal diskon menggunakan logika Voucher::calculateDiscount
+     * Apply multiple vouchers to order (dengan tracking penggunaan)
+     * Support 2 signatures:
+     * 1. Old: applyVouchersToOrder(array of IDs, array of order data) -> array
+     * 2. New: applyVouchersToOrder(array with 'voucher', 'order' keys) -> mixed
      */
-    public function calculateDiscount(Voucher $voucher, int $subtotal, int $shippingCost = 0): int
+    public function applyVouchersToOrder(array $voucherIds, array $orderData = []): mixed
     {
-        return $voucher->calculateDiscount($subtotal, $shippingCost);
+        // Check if this is new signature (config array with 'voucher' key)
+        if (isset($voucherIds['voucher']) && isset($voucherIds['order'])) {
+            $this->applyVoucherToOrderConfig($voucherIds);
+            return null;
+        }
+
+        // Old signature: array of IDs
+        return DB::transaction(function () use ($voucherIds, $orderData) {
+            $appliedVouchers = [];
+
+            foreach ($voucherIds as $voucherId) {
+                $voucher = Voucher::findOrFail($voucherId);
+
+                // Increment usage
+                $voucher->incrementUsage(1);
+
+                // Create usage snapshot
+                $usage = VoucherUsage::create([
+                    'voucher_id' => $voucher->id,
+                    'user_id' => $orderData['user_id'] ?? null,
+                    'order_id' => $orderData['order_id'] ?? null,
+                    'voucher_name' => $voucher->name,
+                    'voucher_code' => $voucher->code,
+                    'voucher_type' => $voucher->type,
+                    'voucher_value' => $voucher->value,
+                    'discount_amount' => $orderData['discounts'][$voucherId]['discount_amount'] ?? 0,
+                    'shipping_discount' => $orderData['discounts'][$voucherId]['shipping_discount'] ?? 0,
+                    'invoice_number' => $orderData['invoice_number'] ?? null,
+                    'order_subtotal' => $orderData['order_subtotal'] ?? 0,
+                    'order_grand_total' => $orderData['order_grand_total'] ?? 0,
+                    'status' => 'used',
+                    'ip_address' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                    'used_at' => now(),
+                ]);
+
+                $appliedVouchers[] = $usage;
+            }
+
+            return $appliedVouchers;
+        });
     }
 
     /**
-     * Create voucher usage snapshot and increment usage within transaction
+     * Apply single voucher to order (helper untuk CheckoutController)
      */
-    public function applyVoucherToOrder(Voucher $voucher, array $data): VoucherUsage
+    private function applyVoucherToOrderConfig(array $config): void
     {
-        return DB::transaction(function () use ($voucher, $data) {
-            // increment usage
+        DB::transaction(function () use ($config) {
+            $voucher = $config['voucher'];
+            $order = $config['order'];
+            $user = $config['user'] ?? null;
+            $discountAmount = $config['discount_amount'] ?? 0;
+            $shippingDiscount = $config['shipping_discount'] ?? 0;
+
+            // Increment usage
             $voucher->incrementUsage(1);
 
-            // create usage snapshot
-            return VoucherUsage::create([
+            // Create usage snapshot
+            VoucherUsage::create([
                 'voucher_id' => $voucher->id,
-                'user_id' => $data['user_id'] ?? null,
-                'order_id' => $data['order_id'] ?? null,
+                'user_id' => $user?->id,
+                'order_id' => $order->id,
                 'voucher_name' => $voucher->name,
                 'voucher_code' => $voucher->code,
                 'voucher_type' => $voucher->type,
                 'voucher_value' => $voucher->value,
-                'discount_amount' => $data['discount_amount'] ?? 0,
-                'shipping_discount' => $data['shipping_discount'] ?? 0,
-                'invoice_number' => $data['invoice_number'] ?? null,
-                'order_subtotal' => $data['order_subtotal'] ?? 0,
-                'order_grand_total' => $data['order_grand_total'] ?? 0,
+                'discount_amount' => $discountAmount,
+                'shipping_discount' => $shippingDiscount,
+                'invoice_number' => $order->invoice_number,
+                'order_subtotal' => $order->subtotal,
+                'order_grand_total' => $order->grand_total,
                 'status' => 'used',
                 'ip_address' => request()->ip(),
                 'user_agent' => request()->userAgent(),
@@ -371,15 +598,31 @@ class VoucherService
     }
 
     /**
-     * Cek apakah voucher dapat dipakai sekarang (public helper)
+     * Get list available vouchers untuk display
      */
-    public function canUse(Voucher $voucher, Cart $cart): bool
+    public function getAvailableVouchers(int $limit = 10): Collection
     {
-        try {
-            $this->validate($cart, $voucher->code);
-            return true;
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return Voucher::valid()
+            ->where('is_active', true)
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get()
+            ->map(fn($v) => [
+                'id' => $v->id,
+                'code' => $v->code,
+                'name' => $v->name,
+                'description' => $v->description,
+                'type' => $v->type,
+                'type_label' => $v->type_label,
+                'value' => $v->value,
+                'maximum_discount' => $v->maximum_discount,
+                'label' => $v->label,
+                'badge_color' => $v->badge_color ?? '#FF6B6B',
+                'is_sold_out' => $v->is_sold_out,
+                'remaining_quota' => $v->remaining_quota,
+                'is_combinable' => $v->is_combinable,
+                'minimum_purchase' => $v->minimum_purchase,
+                'image_path' => $v->image_path,
+            ]);
     }
 }
