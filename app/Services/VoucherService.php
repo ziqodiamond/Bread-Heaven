@@ -371,8 +371,8 @@ class VoucherService
      */
     public function validateProducts(Voucher $voucher, $cartItems): bool
     {
-        $included = $voucher->products()->wherePivot('is_excluded', false)->pluck('id')->toArray();
-        $excluded = $voucher->products()->wherePivot('is_excluded', true)->pluck('id')->toArray();
+        $included = $voucher->products()->wherePivot('is_excluded', false)->distinct()->select('products.id')->get()->pluck('id')->toArray();
+        $excluded = $voucher->products()->wherePivot('is_excluded', true)->distinct()->select('products.id')->get()->pluck('id')->toArray();
 
         foreach ($cartItems as $item) {
             $productId = $item->product_id ?? ($item->product->id ?? null);
@@ -395,8 +395,8 @@ class VoucherService
      */
     public function validateCategories(Voucher $voucher, $cartItems): bool
     {
-        $included = $voucher->categories()->wherePivot('is_excluded', false)->pluck('id')->toArray();
-        $excluded = $voucher->categories()->wherePivot('is_excluded', true)->pluck('id')->toArray();
+        $included = $voucher->categories()->wherePivot('is_excluded', false)->distinct()->select('categories.id')->get()->pluck('id')->toArray();
+        $excluded = $voucher->categories()->wherePivot('is_excluded', true)->distinct()->select('categories.id')->get()->pluck('id')->toArray();
 
         if (empty($included) && empty($excluded)) {
             return true;
@@ -430,8 +430,8 @@ class VoucherService
             return true;
         }
 
-        $included = $voucher->shippingMethods()->wherePivot('is_excluded', false)->pluck('id')->toArray();
-        $excluded = $voucher->shippingMethods()->wherePivot('is_excluded', true)->pluck('id')->toArray();
+        $included = $voucher->shippingMethods()->wherePivot('is_excluded', false)->distinct()->select('shipping_methods.id')->get()->pluck('id')->toArray();
+        $excluded = $voucher->shippingMethods()->wherePivot('is_excluded', true)->distinct()->select('shipping_methods.id')->get()->pluck('id')->toArray();
 
         if (!empty($included) && !in_array($shippingMethod->id, $included, true)) {
             return false;
@@ -453,8 +453,8 @@ class VoucherService
             return true;
         }
 
-        $included = $voucher->paymentMethods()->wherePivot('is_excluded', false)->pluck('id')->toArray();
-        $excluded = $voucher->paymentMethods()->wherePivot('is_excluded', true)->pluck('id')->toArray();
+        $included = $voucher->paymentMethods()->wherePivot('is_excluded', false)->distinct()->select('payment_methods.id')->get()->pluck('id')->toArray();
+        $excluded = $voucher->paymentMethods()->wherePivot('is_excluded', true)->distinct()->select('payment_methods.id')->get()->pluck('id')->toArray();
 
         if (!empty($included) && !in_array($paymentMethod->id, $included, true)) {
             return false;
@@ -620,9 +620,13 @@ class VoucherService
                 'badge_color' => $v->badge_color ?? '#FF6B6B',
                 'is_sold_out' => $v->is_sold_out,
                 'remaining_quota' => $v->remaining_quota,
+                'quota' => $v->quota,
+                'used_count' => $v->used_count ?? 0,
                 'is_combinable' => $v->is_combinable,
                 'minimum_purchase' => $v->minimum_purchase,
                 'image_path' => $v->image_path,
+                'members_only' => $v->members_only ?? false,
+                'max_usage_per_user' => $v->max_usage_per_user ?? 1,
             ]);
     }
 }

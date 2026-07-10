@@ -1018,7 +1018,7 @@
                             </div>
                         </div>
                         <div class="p-6">
-                            <x-checkout-voucher-section 
+                            <x-checkout-voucher 
                                 :appliedVouchers="$appliedVouchers ?? []"
                                 :subtotal="$subtotal ?? 0"
                             />

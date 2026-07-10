@@ -119,17 +119,73 @@ class VoucherController extends Controller
     }
 
     /**
-     * List available vouchers untuk display
+     * List available vouchers dengan detailed info (can_apply, reasons, etc)
      */
     public function available(Request $request): JsonResponse
     {
         try {
-            $limit = $request->input('limit', 10);
+            $limit = $request->input('limit', 20);
+            $user = auth()->user();
+            $cart = $user ? Cart::where('user_id', $user->id)->first() : null;
+
             $vouchers = $this->voucherService->getAvailableVouchers($limit);
+
+            // Enrich with applicability check
+            $vouchersWithStatus = $vouchers->map(function ($voucher) use ($cart, $user) {
+                $canApply = true;
+                $reasons = [];
+
+                if ($cart && $cart->items) {
+                    // Check kuota
+                    if (!$voucher['quota'] || $voucher['used_count'] >= $voucher['quota']) {
+                        $canApply = false;
+                        $reasons[] = 'Kuota voucher sudah habis';
+                    }
+
+                    // Check minimum purchase
+                    if ($voucher['minimum_purchase'] && $cart->subtotal < $voucher['minimum_purchase']) {
+                        $canApply = false;
+                        $reasons[] = 'Minimal pembelian Rp' . number_format($voucher['minimum_purchase'], 0, ',', '.');
+                    }
+
+                    // Check user eligibility
+                    if ($voucher['members_only'] && !$user) {
+                        $canApply = false;
+                        $reasons[] = 'Voucher ini hanya untuk member';
+                    }
+
+                    // Check user usage limit
+                    if ($user) {
+                        $usageCount = \App\Models\VoucherUsage::where('voucher_id', $voucher['id'])
+                            ->where('user_id', $user->id)
+                            ->where('status', 'used')
+                            ->count();
+
+                        $maxUsage = $voucher['max_usage_per_user'] ?? 1;
+                        if ($usageCount >= $maxUsage) {
+                            $canApply = false;
+                            $reasons[] = 'Anda sudah mencapai batas penggunaan voucher ini';
+                        }
+                    }
+                }
+
+                return array_merge($voucher, [
+                    'can_apply' => $canApply,
+                    'reasons' => $reasons,
+                    'quota' => $voucher['remaining_quota'] ?? 0,
+                    'used_count' => $voucher['used_count'] ?? 0,
+                ]);
+            });
+
+            // Sort: usable first, then not usable
+            $sorted = collect([
+                ...$vouchersWithStatus->filter(fn($v) => $v['can_apply'] === true)->values(),
+                ...$vouchersWithStatus->filter(fn($v) => $v['can_apply'] === false)->values(),
+            ]);
 
             return response()->json([
                 'success' => true,
-                'data' => $vouchers,
+                'data' => $sorted->values()->toArray(),
             ]);
 
         } catch (\Exception $e) {
