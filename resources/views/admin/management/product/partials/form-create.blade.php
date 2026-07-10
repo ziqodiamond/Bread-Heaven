@@ -32,9 +32,14 @@
             <label for="create_category" class="block text-xs font-medium text-gray-600">
                 Kategori <span class="text-red-500">*</span>
             </label>
-            <input type="text" name="category" id="create_category" placeholder="Contoh: Roti" required
+            <select name="category_id" id="create_category" required
                 class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
                        placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+                <option value="">-- Pilih Kategori --</option>
+                @foreach ($categories as $category)
+                    <option value="{{ $category->id }}">{{ $category->name }}</option>
+                @endforeach
+            </select>
         </div>
     </div>
 

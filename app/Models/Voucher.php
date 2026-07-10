@@ -112,6 +112,14 @@ class Voucher extends Model
 
         /*
         |--------------------------------------------------------------------------
+        | Media
+        |--------------------------------------------------------------------------
+        */
+
+        'image_path',
+
+        /*
+        |--------------------------------------------------------------------------
         | Analytics
         |--------------------------------------------------------------------------
         */
@@ -127,6 +135,12 @@ class Voucher extends Model
 
         'meta_title',
         'meta_description',
+
+        // Rule flags
+        'allow_on_flash_sale',
+        'allow_on_discount',
+        'exclude_digital',
+
     ];
 
     /*
@@ -188,6 +202,11 @@ class Voucher extends Model
             'start_at' => 'datetime',
 
             'end_at' => 'datetime',
+
+            // Rule flags
+            'allow_on_flash_sale' => 'boolean',
+            'allow_on_discount' => 'boolean',
+            'exclude_digital' => 'boolean',
         ];
     }
 
@@ -205,6 +224,52 @@ class Voucher extends Model
         return $this->hasMany(
             VoucherUsage::class
         );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships with products / categories / brands / shipping / payment
+    |--------------------------------------------------------------------------
+    */
+
+    public function products()
+    {
+        return $this->belongsToMany(
+            \App\Models\Product::class,
+            'voucher_products',
+            'voucher_id',
+            'product_id'
+        )->withPivot('is_excluded');
+    }
+
+    public function categories()
+    {
+        return $this->belongsToMany(
+            \App\Models\Category::class,
+            'voucher_categories',
+            'voucher_id',
+            'category_id'
+        )->withPivot('is_excluded');
+    }
+
+    public function shippingMethods()
+    {
+        return $this->belongsToMany(
+            \App\Models\ShippingMethod::class,
+            'voucher_shipping_methods',
+            'voucher_id',
+            'shipping_method_id'
+        )->withPivot('is_excluded');
+    }
+
+    public function paymentMethods()
+    {
+        return $this->belongsToMany(
+            \App\Models\PaymentMethod::class,
+            'voucher_payment_methods',
+            'voucher_id',
+            'payment_method_id'
+        )->withPivot('is_excluded');
     }
 
     /*

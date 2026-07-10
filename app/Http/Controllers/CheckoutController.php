@@ -410,7 +410,29 @@ class CheckoutController extends Controller
 
         $serviceFee     = $paymentMethod->calculateFee($subtotal + $shippingFee);
         $discountAmount = 0;
-        $grandTotal     = $subtotal + $shippingFee + $serviceFee - $discountAmount;
+        $shippingDiscount = 0;
+
+        // Jika ada voucher di cart, validasi ulang saat user submit order
+        if (!empty($cart->voucher_code)) {
+            $voucherService = app(\App\Services\VoucherService::class);
+
+            try {
+                $vResult = $voucherService->validate($cart, $cart->voucher_code);
+
+                $discountAmount = $vResult['discount_amount'] ?? 0;
+                $shippingDiscount = $vResult['shipping_discount'] ?? 0;
+
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                // Jika voucher tidak valid saat submit order → kembalikan user ke checkout
+                $message = collect($e->errors())->flatten()->first() ?? 'Voucher tidak valid.';
+                session()->flash('checkout_alerts', [$message]);
+                return redirect()->route('checkout.index');
+            }
+        }
+
+        // Hitung final shipping cost & grand total
+        $finalShippingCost = max(0, ($shippingFee - $shippingDiscount));
+        $grandTotal     = $subtotal + $finalShippingCost + $serviceFee - $discountAmount;
 
         /* ------------------------------------------------------------------ */
         /* Verifikasi perubahan harga / stok sebelum buat order                */
@@ -498,7 +520,16 @@ class CheckoutController extends Controller
             'shipping_cost'   => $shippingFee,
             'service_fee'     => $serviceFee,
             'discount_amount' => $discountAmount,
+            'shipping_discount' => $shippingDiscount,
+            'final_shipping_cost' => $finalShippingCost,
             'grand_total'     => $grandTotal,
+
+            // Voucher snapshot (jika ada)
+            'voucher_code'    => $cart->voucher_code,
+            'voucher_name'    => $cart->voucher_name,
+            'voucher_type'    => $cart->voucher_snapshot['type'] ?? null,
+            'voucher_value'   => $cart->voucher_snapshot['value'] ?? null,
+            'voucher_snapshot' => $cart->voucher_snapshot ?? null,
 
             // Berat
             'total_weight' => $totalWeight,
@@ -608,6 +639,31 @@ class CheckoutController extends Controller
                 // Raw response dari Biteship (untuk audit/debug)
                 'response' => $shippingRateRaw,
             ]);
+        }
+
+        /* ------------------------------------------------------------------ */
+        /* Buat VoucherUsage (snapshot) jika ada voucher                         */
+        /* ------------------------------------------------------------------ */
+        if (! empty($cart->voucher_code)) {
+            try {
+                $voucherService = app(\App\Services\VoucherService::class);
+                $voucher = \App\Models\Voucher::where('code', $cart->voucher_code)->first();
+
+                if ($voucher) {
+                    $voucherService->applyVoucherToOrder($voucher, [
+                        'user_id' => $user->id,
+                        'order_id' => $order->id,
+                        'discount_amount' => $discountAmount,
+                        'shipping_discount' => $shippingDiscount,
+                        'invoice_number' => $order->invoice_number,
+                        'order_subtotal' => $order->subtotal,
+                        'order_grand_total' => $order->grand_total,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                \Log::warning('CheckoutController::VoucherUsage failed', ['error' => $e->getMessage()]);
+                // Tidak menghentikan alur checkout kalau perekaman voucher gagal
+            }
         }
 
         /* ------------------------------------------------------------------ */

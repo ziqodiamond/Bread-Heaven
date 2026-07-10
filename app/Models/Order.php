@@ -129,6 +129,7 @@ class Order extends Model
         'voucher_name',
         'voucher_type',
         'voucher_value',
+        'voucher_snapshot',
 
         /*
         |--------------------------------------------------------------------------
@@ -214,6 +215,7 @@ class Order extends Model
             'grand_total' => 'integer',
 
             'voucher_value' => 'integer',
+            'voucher_snapshot' => 'array',
 
             /*
             |--------------------------------------------------------------------------

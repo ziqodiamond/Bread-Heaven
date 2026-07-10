@@ -81,7 +81,7 @@
 
                                 <td class="px-5 py-3.5 font-medium text-gray-900">
                                     {{ $product->name }}
-                                    <p class="text-[11px] text-gray-400 font-normal mt-0.5">{{ $product->category }}</p>
+                                    <p class="text-[11px] text-gray-400 font-normal mt-0.5">{{ $product->category?->name ?? '-' }}</p>
                                 </td>
 
                                 <td class="px-5 py-3.5 text-gray-500 max-w-[200px]">

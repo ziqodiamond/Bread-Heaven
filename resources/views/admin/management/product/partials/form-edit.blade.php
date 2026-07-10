@@ -40,10 +40,16 @@
             <label for="edit_category_{{ $product->id }}" class="block text-xs font-medium text-gray-600">
                 Kategori <span class="text-red-500">*</span>
             </label>
-            <input type="text" name="category" id="edit_category_{{ $product->id }}"
-                value="{{ old('category', $product->category) }}" required
+            <select name="category_id" id="edit_category_{{ $product->id }}" required
                 class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
                        placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+                <option value="">-- Pilih Kategori --</option>
+                @foreach ($categories as $category)
+                    <option value="{{ $category->id }}" {{ old('category_id', $product->category_id) == $category->id ? 'selected' : '' }}>
+                        {{ $category->name }}
+                    </option>
+                @endforeach
+            </select>
         </div>
     </div>
 

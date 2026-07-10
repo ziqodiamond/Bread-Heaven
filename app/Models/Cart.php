@@ -84,6 +84,7 @@ class Cart extends Model
 
         'voucher_code',
         'voucher_name',
+        'voucher_snapshot',
 
         /*
         |--------------------------------------------------------------------------
@@ -121,6 +122,7 @@ class Cart extends Model
             */
 
             'expired_at' => 'datetime',
+            'voucher_snapshot' => 'array',
         ];
     }
 

@@ -6,6 +6,7 @@ use App\Models\Cart;
 use App\Models\Voucher;
 use App\Models\VoucherUsage;
 use Illuminate\Validation\ValidationException;
+use App\Services\VoucherService;
 
 class DiscountService
 {
@@ -23,163 +24,42 @@ class DiscountService
         string $voucherCode
     ): array {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Cari voucher
-        |--------------------------------------------------------------------------
-        */
+        // Delegasikan validasi ke VoucherService agar semua rule terpusat
+        $voucherService = new VoucherService();
 
-        $voucher = Voucher::query()
+        $result = $voucherService->validate($cart, $voucherCode);
 
-            ->valid()
+        $voucher = $result['voucher'];
 
-            ->where(
-                'code',
-                strtoupper($voucherCode)
-            )
+        $discountAmount = $result['discount_amount'] ?? 0;
+        $shippingDiscount = $result['shipping_discount'] ?? 0;
 
-            ->first();
+        // Siapkan snapshot voucher (agar frontend menampilkan dan untuk order snapshot nanti)
+        $snapshot = [
+            'id' => $voucher->id,
+            'code' => $voucher->code,
+            'name' => $voucher->name,
+            'type' => $voucher->type,
+            'value' => $voucher->value,
+            'maximum_discount' => $voucher->maximum_discount,
+        ];
 
-        if (!$voucher) {
-
-            throw ValidationException::withMessages([
-                'voucher' => 'Voucher tidak valid.',
-            ]);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Validasi quota voucher
-        |--------------------------------------------------------------------------
-        */
-
-        if (!$voucher->hasQuota()) {
-
-            throw ValidationException::withMessages([
-                'voucher' => 'Quota voucher sudah habis.',
-            ]);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Validasi minimum belanja
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            !$voucher->validateMinimumPurchase(
-                $cart->subtotal
-            )
-        ) {
-
-            throw ValidationException::withMessages([
-                'voucher' =>
-                'Minimum belanja untuk voucher ini adalah Rp' .
-                    number_format(
-                        $voucher->minimum_purchase,
-                        0,
-                        ',',
-                        '.'
-                    ),
-            ]);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Validasi penggunaan voucher user
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            $cart->user &&
-            $cart->user->voucherUsageCount(
-                $voucher->id
-            ) >= $voucher->max_usage_per_user
-        ) {
-
-            throw ValidationException::withMessages([
-                'voucher' =>
-                'Voucher sudah mencapai batas penggunaan.',
-            ]);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Hitung discount
-        |--------------------------------------------------------------------------
-        */
-
-        $discountAmount = 0;
-
-        $shippingDiscount = 0;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Free Shipping Voucher
-        |--------------------------------------------------------------------------
-        */
-
-        if ($voucher->type === 'free_shipping') {
-
-            // Nanti shipping cost realtime
-            // diambil saat checkout
-
-            $shippingDiscount = 0;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Product Discount Voucher
-        |--------------------------------------------------------------------------
-        */ else {
-
-            $discountAmount =
-                $voucher->calculateDiscount(
-                    $cart->subtotal
-                );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Simpan voucher ke cart
-        |--------------------------------------------------------------------------
-        */
-
+        // Simpan snapshot voucher ke cart
         $cart->update([
-
             'voucher_code' => $voucher->code,
-
             'voucher_name' => $voucher->name,
-
             'discount_amount' => $discountAmount,
+            'voucher_snapshot' => $snapshot,
         ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Refresh summary cart
-        |--------------------------------------------------------------------------
-        */
 
         $cart->refreshCartSummary();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Response
-        |--------------------------------------------------------------------------
-        */
-
         return [
-
             'success' => true,
-
             'message' => 'Voucher berhasil digunakan.',
-
             'voucher' => $voucher,
-
             'discount_amount' => $discountAmount,
-
             'shipping_discount' => $shippingDiscount,
-
             'final_subtotal' => $cart->fresh()->final_subtotal,
         ];
     }

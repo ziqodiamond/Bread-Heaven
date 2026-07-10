@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\DiscountController;
 use App\Http\Controllers\Admin\FlashSaleController;
 use App\Http\Controllers\Admin\VoucherController;
+use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
@@ -104,6 +105,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:ad
     Route::get('/', [AdminController::class, 'index'])->name('dashboard');
 
     Route::prefix('management')->name('management.')->group(function () {
+
+        Route::prefix('categories')->name('categories.')->group(function () {
+            Route::get('/', [CategoryController::class, 'index'])->name('index');
+            Route::get('/create', [CategoryController::class, 'create'])->name('create');
+            Route::post('/', [CategoryController::class, 'store'])->name('store');
+            Route::get('/{category}/edit', [CategoryController::class, 'edit'])->name('edit');
+            Route::put('/{category}', [CategoryController::class, 'update'])->name('update');
+            Route::delete('/{category}', [CategoryController::class, 'destroy'])->name('destroy');
+        });
 
         Route::prefix('products')->name('products.')->group(function () {
             Route::get('/', [ProductController::class, 'index'])->name('index');

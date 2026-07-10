@@ -46,7 +46,7 @@ class Product extends Model
         'name',
         'slug',
         'sku',
-        'category',
+        'category_id',
         'description',
 
         /*
@@ -162,6 +162,20 @@ class Product extends Model
     | Relationships
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * Relasi kategori
+     *
+     * Cara pakai:
+     * $product->category
+     */
+    public function category()
+    {
+        return $this->belongsTo(
+            Category::class,
+            'category_id'
+        );
+    }
 
     /**
      * Relasi item cart
@@ -592,14 +606,14 @@ class Product extends Model
      * Filter berdasarkan kategori
      *
      * Cara pakai:
-     * Product::category('makanan')->get();
+     * Product::category(1)->get();
      */
     public function scopeCategory(
         $query,
-        string $category
+        $category
     ) {
         return $query->where(
-            'category',
+            'category_id',
             $category
         );
     }
