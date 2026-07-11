@@ -624,7 +624,8 @@ class VoucherService
                 'used_count' => $v->used_count ?? 0,
                 'is_combinable' => $v->is_combinable,
                 'minimum_purchase' => $v->minimum_purchase,
-                'image_path' => $v->image_path,
+                'image_url' => $v->image_url,
+                'end_at' => $v->end_at?->toIso8601String(),
                 'members_only' => $v->members_only ?? false,
                 'max_usage_per_user' => $v->max_usage_per_user ?? 1,
             ]);

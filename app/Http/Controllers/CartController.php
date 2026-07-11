@@ -115,34 +115,90 @@ class CartController extends Controller
 
         // Validasi stok
         if (!$product->hasEnoughStock($request->quantity)) {
-
-            return back()->with(
-                'error',
-                'Stok produk tidak mencukupi.'
-            );
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stok produk tidak mencukupi.'
+                ], 422);
+            }
+            return back()->with('error', 'Stok produk tidak mencukupi.');
         }
 
         // Update quantity
         $cartItem->updateQuantity($request->quantity);
 
-        return back()->with(
-            'success',
-            'Cart berhasil diperbarui.'
-        );
+        // Refresh cart for updated data
+        $cart = $cartItem->cart;
+        $cart->refreshCartSummary();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Cart berhasil diperbarui.',
+                'data' => [
+                    'items' => $cart->items()->with('product')->get()->map(fn($item) => [
+                        'id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'product_name' => $item->product_name,
+                        'product_image_url' => $item->product->thumbnail ?? null,
+                        'quantity' => $item->quantity,
+                        'product_price' => $item->product_price,
+                        'original_price' => $item->original_price,
+                        'subtotal' => $item->subtotal,
+                        'discount_amount' => $item->discount_amount,
+                    ]),
+                    'summary' => [
+                        'total_items' => $cart->total_items,
+                        'total_quantity' => $cart->total_quantity,
+                        'subtotal' => $cart->subtotal,
+                        'discount_amount' => $cart->total_discount_amount ?? 0,
+                        'final_subtotal' => $cart->final_subtotal,
+                    ],
+                ],
+            ]);
+        }
+
+        return back()->with('success', 'Cart berhasil diperbarui.');
     }
 
     /**
      * Hapus item cart
      */
-    public function removeItem(string $id)
+    public function removeItem(Request $request, string $id)
     {
         $cartItem = CartItem::findOrFail($id);
+        $cart = $cartItem->cart;
 
         $cartItem->delete();
+        $cart->refreshCartSummary();
 
-        return back()->with(
-            'success',
-            'Item berhasil dihapus dari cart.'
-        );
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Item berhasil dihapus dari cart.',
+                'data' => [
+                    'items' => $cart->items()->with('product')->get()->map(fn($item) => [
+                        'id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'product_name' => $item->product_name,
+                        'product_image_url' => $item->product->thumbnail ?? null,
+                        'quantity' => $item->quantity,
+                        'product_price' => $item->product_price,
+                        'original_price' => $item->original_price,
+                        'subtotal' => $item->subtotal,
+                        'discount_amount' => $item->discount_amount,
+                    ]),
+                    'summary' => [
+                        'total_items' => $cart->total_items,
+                        'total_quantity' => $cart->total_quantity,
+                        'subtotal' => $cart->subtotal,
+                        'discount_amount' => $cart->total_discount_amount ?? 0,
+                        'final_subtotal' => $cart->final_subtotal,
+                    ],
+                ],
+            ]);
+        }
+
+        return back()->with('success', 'Item berhasil dihapus dari cart.');
     }
 }

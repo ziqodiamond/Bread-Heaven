@@ -19,14 +19,22 @@ class VoucherController extends Controller
     }
 
     /**
-     * Tambah voucher ke cart
+     * Tambah voucher ke cart (support by ID atau code)
      */
     public function add(Request $request): JsonResponse
     {
         try {
             $request->validate([
-                'voucher_code' => 'required|string|max:50',
+                'voucher_code' => 'nullable|string|max:50',
+                'voucher_id' => 'nullable|string|uuid',
             ]);
+
+            if (!$request->voucher_code && !$request->voucher_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Voucher code atau ID harus diisi.',
+                ], 422);
+            }
 
             $cart = Cart::where('user_id', auth()->id())->first();
             if (!$cart) {
@@ -36,18 +44,48 @@ class VoucherController extends Controller
                 ], 404);
             }
 
-            $result = $this->voucherService->addVoucher($cart, $request->voucher_code);
+            // Jika kirim voucher_id, cari code terlebih dahulu
+            if ($request->voucher_id) {
+                $voucher = Voucher::find($request->voucher_id);
+                if (!$voucher) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Voucher tidak ditemukan.',
+                    ], 404);
+                }
+                $voucherCode = $voucher->code;
+            } else {
+                $voucherCode = $request->voucher_code;
+            }
+
+            $result = $this->voucherService->addVoucher($cart, $voucherCode);
+            $cart->refresh();
 
             return response()->json([
                 'success' => true,
                 'message' => $result['message'],
                 'data' => [
-                    'vouchers' => $cart->getAppliedVouchers()->toArray(),
-                    'total_discount' => $cart->total_discount_amount,
-                    'total_shipping_discount' => $cart->total_shipping_discount,
-                    'cart_summary' => [
+                    'items' => $cart->items()->with('product')->get()->map(fn($item) => [
+                        'id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'product_name' => $item->product_name,
+                        'product_image_url' => $item->product->thumbnail ?? null,
+                        'quantity' => $item->quantity,
+                        'product_price' => $item->product_price,
+                        'original_price' => $item->original_price,
+                        'subtotal' => $item->subtotal,
+                        'discount_amount' => $item->discount_amount,
+                    ]),
+                    'vouchers' => $cart->getAppliedVouchers()->map(fn($v) => [
+                        'id' => $v->id,
+                        'name' => $v->name,
+                        'code' => $v->code,
+                    ])->toArray(),
+                    'summary' => [
+                        'total_items' => $cart->total_items,
+                        'total_quantity' => $cart->total_quantity,
                         'subtotal' => $cart->subtotal,
-                        'discount' => $cart->total_discount_amount,
+                        'discount_amount' => $cart->total_discount_amount ?? 0,
                         'final_subtotal' => $cart->final_subtotal,
                     ],
                 ],
@@ -93,12 +131,27 @@ class VoucherController extends Controller
                 'success' => true,
                 'message' => $result['message'],
                 'data' => [
-                    'vouchers' => $cart->getAppliedVouchers()->toArray(),
-                    'total_discount' => $cart->total_discount_amount,
-                    'total_shipping_discount' => $cart->total_shipping_discount,
-                    'cart_summary' => [
+                    'items' => $cart->items()->with('product')->get()->map(fn($item) => [
+                        'id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'product_name' => $item->product_name,
+                        'product_image_url' => $item->product->thumbnail ?? null,
+                        'quantity' => $item->quantity,
+                        'product_price' => $item->product_price,
+                        'original_price' => $item->original_price,
+                        'subtotal' => $item->subtotal,
+                        'discount_amount' => $item->discount_amount,
+                    ]),
+                    'vouchers' => $cart->getAppliedVouchers()->map(fn($v) => [
+                        'id' => $v->id,
+                        'name' => $v->name,
+                        'code' => $v->code,
+                    ])->toArray(),
+                    'summary' => [
+                        'total_items' => $cart->total_items,
+                        'total_quantity' => $cart->total_quantity,
                         'subtotal' => $cart->subtotal,
-                        'discount' => $cart->total_discount_amount,
+                        'discount_amount' => $cart->total_discount_amount ?? 0,
                         'final_subtotal' => $cart->final_subtotal,
                     ],
                 ],

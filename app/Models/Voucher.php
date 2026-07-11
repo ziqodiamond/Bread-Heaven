@@ -400,6 +400,20 @@ class Voucher extends Model
         };
     }
 
+    /**
+     * Full image URL for voucher
+     *
+     * Cara pakai: $voucher->image_url
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (!$this->image_path) {
+            return null;
+        }
+
+        return asset('storage/' . ltrim($this->image_path, '/'));
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Query Scope
