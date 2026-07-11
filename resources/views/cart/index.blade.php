@@ -85,13 +85,45 @@
                                 <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Pilih Voucher</h3>
 
                                 <!-- Applied Vouchers -->
-                                <template x-if="appliedVouchers.length > 0">
+                                <template x-if="appliedVouchers.length > 0 || voucherWarnings.length > 0">
                                     <div class="mb-4 space-y-2">
                                         <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Voucher Aktif</p>
+
+                                        <!-- Warnings when vouchers were invalidated -->
+                                        <template x-if="voucherWarnings.length > 0">
+                                            <div class="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800">
+                                                <template x-for="(w, idx) in voucherWarnings" :key="idx">
+                                                    <div x-text="w"></div>
+                                                </template>
+                                            </div>
+                                        </template>
+
                                         <template x-for="voucher in appliedVouchers" :key="voucher.id">
-                                            <div class="flex items-center justify-between bg-green-50 dark:bg-green-900/20 rounded-lg p-2">
-                                                <span class="text-sm font-medium text-green-700 dark:text-green-300" x-text="voucher.name"></span>
-                                                <button @click="removeVoucher(voucher.id)" type="button" class="text-xs text-red-600 hover:text-red-700 font-medium">Batal</button>
+                                            <div class="flex items-start gap-3 p-3 rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20 hover:bg-green-100 transition">
+                                                <div class="shrink-0">
+                                                    <div class="h-16 w-16 rounded-lg overflow-hidden bg-white dark:bg-gray-700 flex items-center justify-center">
+                                                        <template x-if="voucher.image_url">
+                                                            <img :src="voucher.image_url" :alt="voucher.name" class="h-full w-full object-cover">
+                                                        </template>
+                                                        <template x-if="!voucher.image_url">
+                                                            <svg class="h-8 w-8 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                                                            </svg>
+                                                        </template>
+                                                    </div>
+                                                </div>
+
+                                                <div class="flex-1 min-w-0">
+                                                    <h4 class="font-semibold text-sm text-green-800 dark:text-green-300 truncate" x-text="voucher.name"></h4>
+                                                    <p class="text-xs text-green-700 dark:text-green-400 mt-1" x-show="voucher.type === 'fixed'" x-text="`Rp${formatPrice(voucher.value)}`"></p>
+                                                    <p class="text-xs text-green-700 dark:text-green-400 mt-1" x-show="voucher.type === 'percent'" x-text="`${voucher.value}% Diskon`"></p>
+                                                    <p class="text-xs text-green-700 dark:text-green-400 mt-1" x-show="voucher.type === 'free_shipping'">Gratis Ongkir</p>
+                                                    <p class="text-xs text-gray-600 dark:text-gray-400 mt-1" x-text="voucher.description"></p>
+                                                    <div class="mt-2 flex items-center gap-2">
+                                                        <button @click="showVoucherDetail(voucher)" type="button" class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">Selengkapnya →</button>
+                                                        <button @click="removeVoucher(voucher.id)" type="button" class="text-xs text-red-600 hover:text-red-800 font-medium">Batal</button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </template>
                                     </div>
@@ -105,10 +137,10 @@
                                             <!-- Left: Image -->
                                             <div class="shrink-0">
                                                 <div class="h-16 w-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                                                    <template x-if="voucher.image_path">
-                                                        <img :src="voucher.image_path" :alt="voucher.name" class="h-full w-full object-cover">
+                                                    <template x-if="voucher.image_url">
+                                                                                                            <img :src="voucher.image_url" :alt="voucher.name" class="h-full w-full object-cover">
                                                     </template>
-                                                    <template x-if="!voucher.image_path">
+                                                                                                        <template x-if="!voucher.image_url">
                                                         <svg class="h-8 w-8 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                                                         </svg>
@@ -237,8 +269,8 @@
                         <!-- Content -->
                         <div class="p-6 space-y-4">
                             <!-- Image -->
-                            <template x-if="selectedVoucher?.image_path">
-                                <img :src="selectedVoucher.image_path" :alt="selectedVoucher.name" class="w-full h-40 object-cover rounded-lg">
+                            <template x-if="selectedVoucher?.image_url">
+                                <img :src="selectedVoucher.image_url" :alt="selectedVoucher.name" class="w-full h-40 object-cover rounded-lg">
                             </template>
 
                             <!-- Details -->
@@ -312,10 +344,16 @@
     })->toArray();
 
     $appliedVouchersArr = $cart->getAppliedVouchers()->map(function($v) {
+        $va = (array) $v;
         return [
-            'id' => $v->id,
-            'name' => $v->name,
-            'code' => $v->code,
+            'id' => $va['id'] ?? null,
+            'name' => $va['name'] ?? null,
+            'code' => $va['code'] ?? null,
+            'description' => $va['description'] ?? null,
+            'image_url' => $va['image_url'] ?? null,
+            'type' => $va['type'] ?? null,
+            'value' => $va['value'] ?? null,
+            'minimum_purchase' => $va['minimum_purchase'] ?? 0,
         ];
     })->toArray();
 ?>
@@ -324,6 +362,7 @@
         function cartApp() {
             return {
                 items: @json($cartItems),
+                voucherWarnings: [],
                 
                 summary: {
                     total_items: @json($cart->total_items),
@@ -336,6 +375,7 @@
                 appliedVouchers: @json($appliedVouchersArr),
 
                 availableVouchers: [],
+                voucherWarnings: [],
                 selectedVoucher: null,
                 showVoucherModal: false,
                 loading: false,
@@ -358,6 +398,8 @@
                                 remaining_quota: v.remaining_quota || v.quota
                             }));
                         }
+                        // Ensure applied vouchers not duplicated
+                        this.appliedVouchers = this.appliedVouchers.filter(av => this.isVoucherApplied(av.id));
                     } catch (error) {
                         console.error('Error loading vouchers:', error);
                     } finally {
@@ -383,6 +425,7 @@
                         const data = await response.json();
                         if (data.success) {
                             this.updateCartData(data.data);
+                            await this.loadAppliedVouchers();
                             this.loadAvailableVouchers();
                         }
                     } catch (error) {
@@ -407,8 +450,9 @@
                         if (data.success) {
                             this.items = this.items.filter(i => i.id !== itemId);
                             this.updateCartData(data.data);
-                            this.loadAvailableVouchers();
-                            document.getElementById('item-count').textContent = this.summary.total_items;
+                        await this.loadAppliedVouchers();
+                        this.loadAvailableVouchers();
+                        document.getElementById('item-count').textContent = this.summary.total_items;
                         }
                     } catch (error) {
                         console.error('Error removing item:', error);
@@ -435,9 +479,15 @@
                             this.appliedVouchers = data.data.vouchers.map(v => ({
                                 id: v.id,
                                 name: v.name,
-                                code: v.code
+                                code: v.code,
+                                description: v.description || null,
+                                image_url: v.image_url || null,
+                                type: v.type || null,
+                                value: v.value || null,
+                                minimum_purchase: v.minimum_purchase || 0,
                             }));
                             this.updateCartData(data.data);
+                            await this.loadAppliedVouchers();
                             this.loadAvailableVouchers();
                         }
                     } catch (error) {
@@ -465,9 +515,15 @@
                             this.appliedVouchers = data.data.vouchers.map(v => ({
                                 id: v.id,
                                 name: v.name,
-                                code: v.code
+                                code: v.code,
+                                description: v.description || null,
+                                image_url: v.image_url || null,
+                                type: v.type || null,
+                                value: v.value || null,
+                                minimum_purchase: v.minimum_purchase || 0,
                             }));
                             this.updateCartData(data.data);
+                            await this.loadAppliedVouchers();
                             this.loadAvailableVouchers();
                         }
                     } catch (error) {
@@ -482,6 +538,27 @@
                     this.showVoucherModal = true;
                 },
 
+                async loadAppliedVouchers() {
+                    try {
+                        const resp = await fetch('{{ route('cart.vouchers.current') }}', { headers: { 'Accept': 'application/json' } });
+                        const res = await resp.json();
+                        if (res.success) {
+                            this.appliedVouchers = (res.data.vouchers || []).map(v => ({
+                                id: v.id,
+                                name: v.name,
+                                code: v.code,
+                                description: v.description || null,
+                                image_url: v.image_url || null,
+                                type: v.type || null,
+                                value: v.value || null,
+                                minimum_purchase: v.minimum_purchase || 0,
+                            }));
+                        }
+                    } catch (e) {
+                        console.error('Error loading applied vouchers', e);
+                    }
+                },
+
                 updateCartData(data) {
                     if (data.items) {
                         this.items = data.items;
@@ -489,6 +566,26 @@
                     if (data.summary) {
                         this.summary = data.summary;
                         document.getElementById('item-count').textContent = data.summary.total_items;
+                    }
+
+                    // If server reports applied vouchers or invalid vouchers (from revalidation), update UI
+                    if (data.applied_vouchers) {
+                        this.appliedVouchers = (data.applied_vouchers || []).map(v => ({
+                            id: v.id,
+                            name: v.name,
+                            code: v.code,
+                            description: v.description || null,
+                            image_url: v.image_url || null,
+                            type: v.type || null,
+                            value: v.value || null,
+                            minimum_purchase: v.minimum_purchase || 0,
+                        }));
+                    }
+
+                    if (data.invalid_vouchers) {
+                        this.voucherWarnings = data.invalid_vouchers.map(v => v.reason || 'Voucher tidak memenuhi syarat');
+                        // remove warnings after 6s
+                        setTimeout(() => { this.voucherWarnings = []; }, 6000);
                     }
                 },
 

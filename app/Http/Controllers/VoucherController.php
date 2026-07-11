@@ -184,6 +184,12 @@ class VoucherController extends Controller
             $vouchers = $this->voucherService->getAvailableVouchers($limit);
 
             // Enrich with applicability check
+            $appliedIds = [];
+            if ($cart) {
+                $applied = $cart->vouchers ?? [];
+                $appliedIds = array_column($applied, 'id');
+            }
+
             $vouchersWithStatus = $vouchers->map(function ($voucher) use ($cart, $user) {
                 $canApply = true;
                 $reasons = [];
@@ -230,10 +236,15 @@ class VoucherController extends Controller
                 ]);
             });
 
+            // Exclude already applied vouchers
+            $filtered = $vouchersWithStatus->reject(function ($v) use ($appliedIds) {
+                return in_array($v['id'], $appliedIds, true);
+            })->values();
+
             // Sort: usable first, then not usable
             $sorted = collect([
-                ...$vouchersWithStatus->filter(fn($v) => $v['can_apply'] === true)->values(),
-                ...$vouchersWithStatus->filter(fn($v) => $v['can_apply'] === false)->values(),
+                ...$filtered->filter(fn($v) => $v['can_apply'] === true)->values(),
+                ...$filtered->filter(fn($v) => $v['can_apply'] === false)->values(),
             ]);
 
             return response()->json([
@@ -264,7 +275,19 @@ class VoucherController extends Controller
                 ], 404);
             }
 
-            $appliedVouchers = $cart->getAppliedVouchers()->toArray();
+            $appliedVouchers = $cart->getAppliedVouchers()->map(function($v) {
+                $va = (array) $v;
+                return [
+                    'id' => $va['id'] ?? null,
+                    'name' => $va['name'] ?? null,
+                    'code' => $va['code'] ?? null,
+                    'description' => $va['description'] ?? null,
+                    'image_url' => $va['image_url'] ?? null,
+                    'type' => $va['type'] ?? null,
+                    'value' => $va['value'] ?? null,
+                    'minimum_purchase' => $va['minimum_purchase'] ?? 0,
+                ];
+            })->toArray();
 
             return response()->json([
                 'success' => true,

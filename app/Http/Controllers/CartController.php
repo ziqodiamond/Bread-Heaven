@@ -131,6 +131,9 @@ class CartController extends Controller
         $cart = $cartItem->cart;
         $cart->refreshCartSummary();
 
+        // Revalidate vouchers against new cart
+        $revalidation = app(\App\Services\VoucherService::class)->revalidateCartVouchers($cart);
+
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
@@ -154,6 +157,20 @@ class CartController extends Controller
                         'discount_amount' => $cart->total_discount_amount ?? 0,
                         'final_subtotal' => $cart->final_subtotal,
                     ],
+                    'invalid_vouchers' => $revalidation['removed'] ?? [],
+                    'applied_vouchers' => $cart->getAppliedVouchers()->map(function($v) {
+                        $va = (array) $v;
+                        return [
+                            'id' => $va['id'] ?? null,
+                            'name' => $va['name'] ?? null,
+                            'code' => $va['code'] ?? null,
+                            'description' => $va['description'] ?? null,
+                            'image_url' => $va['image_url'] ?? null,
+                            'type' => $va['type'] ?? null,
+                            'value' => $va['value'] ?? null,
+                            'minimum_purchase' => $va['minimum_purchase'] ?? 0,
+                        ];
+                    })->toArray(),
                 ],
             ]);
         }
@@ -171,6 +188,9 @@ class CartController extends Controller
 
         $cartItem->delete();
         $cart->refreshCartSummary();
+
+        // Revalidate vouchers
+        $revalidation = app(\App\Services\VoucherService::class)->revalidateCartVouchers($cart);
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -195,6 +215,20 @@ class CartController extends Controller
                         'discount_amount' => $cart->total_discount_amount ?? 0,
                         'final_subtotal' => $cart->final_subtotal,
                     ],
+                    'invalid_vouchers' => $revalidation['removed'] ?? [],
+                    'applied_vouchers' => $cart->getAppliedVouchers()->map(function($v) {
+                        $va = (array) $v;
+                        return [
+                            'id' => $va['id'] ?? null,
+                            'name' => $va['name'] ?? null,
+                            'code' => $va['code'] ?? null,
+                            'description' => $va['description'] ?? null,
+                            'image_url' => $va['image_url'] ?? null,
+                            'type' => $va['type'] ?? null,
+                            'value' => $va['value'] ?? null,
+                            'minimum_purchase' => $va['minimum_purchase'] ?? 0,
+                        ];
+                    })->toArray(),
                 ],
             ]);
         }

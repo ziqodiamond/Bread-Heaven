@@ -510,6 +510,69 @@ class VoucherService
     }
 
     /**
+     * Revalidate vouchers stored in cart against current cart state.
+     * Removes vouchers that no longer meet rules and updates cart totals.
+     * Returns array of removed voucher info and reasons.
+     */
+    public function revalidateCartVouchers(
+        \App\Models\Cart $cart
+    ): array {
+        $current = $cart->vouchers ?? [];
+        if (empty($current)) {
+            return ['removed' => []];
+        }
+
+        $kept = [];
+        $removed = [];
+
+        foreach ($current as $vData) {
+            try {
+                $voucher = Voucher::find($vData['id']);
+
+                // If voucher not found or not running, remove
+                if (!$voucher || !$voucher->is_running) {
+                    $removed[] = [
+                        'id' => $vData['id'],
+                        'code' => $vData['code'] ?? null,
+                        'reason' => 'Voucher tidak ditemukan atau tidak aktif.',
+                    ];
+                    continue;
+                }
+
+                // Validate rules using existing private method
+                $this->validateQuotaAndRules($voucher, $cart);
+
+                // Keep if no exception
+                $kept[] = $vData;
+
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $removed[] = [
+                    'id' => $vData['id'],
+                    'code' => $vData['code'] ?? null,
+                    'reason' => $e->errors()['voucher'][0] ?? $e->getMessage(),
+                ];
+            } catch (\Exception $e) {
+                $removed[] = [
+                    'id' => $vData['id'],
+                    'code' => $vData['code'] ?? null,
+                    'reason' => $e->getMessage() ?: 'Voucher dibatalkan karena tidak memenuhi syarat.',
+                ];
+            }
+        }
+
+        // If any removed, update cart vouchers
+        if (!empty($removed)) {
+            $this->updateCartVouchers($cart, $kept);
+        }
+
+        return [
+            'removed' => $removed,
+            'kept' => $kept,
+        ];
+    }
+
+
+    /**
      * Apply multiple vouchers to order (dengan tracking penggunaan)
      * Support 2 signatures:
      * 1. Old: applyVouchersToOrder(array of IDs, array of order data) -> array
