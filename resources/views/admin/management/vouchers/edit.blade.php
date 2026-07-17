@@ -131,114 +131,24 @@
                 </div>
             </div>
 
-            {{-- Relasi Voucher (Products / Categories / Brands / Shipping / Payment) --}}
+            {{-- Relasi Voucher --}}
             <div class="space-y-4 border-t pt-4">
                 <h3 class="text-sm font-medium text-gray-900">Relasi Voucher</h3>
-                <p class="text-xs text-gray-500">Kelola produk/kategori/brand/metode pengiriman & pembayaran untuk voucher ini.</p>
+                <p class="text-xs text-gray-500">Kelola kategori, metode pengiriman & pembayaran untuk voucher ini.</p>
 
                 @php
-                    $includedProductIds = $voucher->products->filter(function($p){ return !$p->pivot->is_excluded; })->pluck('id')->toArray();
-                    $excludedProductIds = $voucher->products->filter(function($p){ return $p->pivot->is_excluded; })->pluck('id')->toArray();
+                    // Safe filtering dengan null check
+                    $includedCategoryIds = $voucher->categories ? $voucher->categories->filter(function($c){ return !($c->pivot->is_excluded ?? false); })->pluck('id')->toArray() : [];
+                    $excludedCategoryIds = $voucher->categories ? $voucher->categories->filter(function($c){ return $c->pivot->is_excluded ?? false; })->pluck('id')->toArray() : [];
 
-                    $includedCategoryIds = $voucher->categories->filter(function($c){ return !$c->pivot->is_excluded; })->pluck('id')->toArray();
-                    $excludedCategoryIds = $voucher->categories->filter(function($c){ return $c->pivot->is_excluded; })->pluck('id')->toArray();
+                    $includedShippingIds = $voucher->shippingMethods ? $voucher->shippingMethods->filter(function($s){ return !($s->pivot->is_excluded ?? false); })->pluck('id')->toArray() : [];
+                    $excludedShippingIds = $voucher->shippingMethods ? $voucher->shippingMethods->filter(function($s){ return $s->pivot->is_excluded ?? false; })->pluck('id')->toArray() : [];
 
-                    $includedBrandIds = $voucher->brands->filter(function($b){ return !$b->pivot->is_excluded; })->pluck('id')->toArray();
-                    $excludedBrandIds = $voucher->brands->filter(function($b){ return $b->pivot->is_excluded; })->pluck('id')->toArray();
-
-                    $includedShippingIds = $voucher->shippingMethods->filter(function($s){ return !$s->pivot->is_excluded; })->pluck('id')->toArray();
-                    $excludedShippingIds = $voucher->shippingMethods->filter(function($s){ return $s->pivot->is_excluded; })->pluck('id')->toArray();
-
-                    $includedPaymentIds = $voucher->paymentMethods->filter(function($p){ return !$p->pivot->is_excluded; })->pluck('id')->toArray();
-                    $excludedPaymentIds = $voucher->paymentMethods->filter(function($p){ return $p->pivot->is_excluded; })->pluck('id')->toArray();
+                    $includedPaymentIds = $voucher->paymentMethods ? $voucher->paymentMethods->filter(function($p){ return !($p->pivot->is_excluded ?? false); })->pluck('id')->toArray() : [];
+                    $excludedPaymentIds = $voucher->paymentMethods ? $voucher->paymentMethods->filter(function($p){ return $p->pivot->is_excluded ?? false; })->pluck('id')->toArray() : [];
                 @endphp
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600">Produk (Include)</label>
-                        <div x-data="multiSelectModal({ items: @json($products->map(fn($p)=>['id'=>$p->id,'label'=>$p->name])), selected: @json(old('included_products', $includedProductIds)), name: 'included_products[]' })" class="relative">
-                            <button type="button" @click="open = true" class="w-full text-left rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 bg-white">
-                                <template x-if="selected.length === 0"><span class="text-gray-400">Pilih produk &hellip;</span></template>
-                                <template x-if="selected.length &gt; 0"><span x-text="selected.length + ' produk dipilih'"></span></template>
-                            </button>
-                            <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click="if ($event.target === $el) open = false">
-                                <div @click.stop class="w-full max-w-2xl bg-white rounded-xl p-4">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <input type="search" x-model="q" placeholder="Cari produk..." class="flex-1 rounded-md border px-3 py-2">
-                                        <label class="inline-flex items-center gap-2 text-sm">
-                                            <input type="checkbox" @click="toggleSelectAllFiltered()" :checked="allFilteredSelected">
-                                            <span>Pilih semua (filter)</span>
-                                        </label>
-                                    </div>
-                                    <div class="max-h-64 overflow-auto border rounded-md p-2 space-y-1">
-                                        <template x-for="item in filteredItems" :key="item.id">
-                                            <label class="flex items-center gap-2 p-1 rounded hover:bg-gray-50">
-                                                <input type="checkbox" x-model="selected" :value="item.id">
-                                                <span x-text="item.label" class="text-sm"></span>
-                                            </label>
-                                        </template>
-                                    </div>
-                                    <div class="mt-3 flex items-center justify-between">
-                                        <div class="flex items-center gap-2">
-                                            <button type="button" @click="clearSelection()" class="text-sm text-gray-600">Bersihkan</button>
-                                            <button type="button" @click="selectAll()" class="text-sm text-gray-600">Pilih Semua</button>
-                                        </div>
-                                        <div>
-                                            <button type="button" @click="open=false" class="px-3 py-2 rounded bg-gray-100">Tutup</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <template x-for="id in selected" :key="id"><input type="hidden" :name="name" :value="id"></template>
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                <template x-for="id in selected.slice(0,5)" :key="id"><span class="px-2 py-1 bg-gray-100 rounded text-xs" x-text="getLabel(id)"></span></template>
-                                <template x-if="selected.length &gt; 5"><span class="px-2 py-1 bg-gray-100 rounded text-xs">+<span x-text="selected.length - 5"></span> lainnya</span></template>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600">Produk (Exclude)</label>
-                        <div x-data="multiSelectModal({ items: @json($products->map(fn($p)=>['id'=>$p->id,'label'=>$p->name])), selected: @json(old('excluded_products', $excludedProductIds)), name: 'excluded_products[]' })" class="relative">
-                            <button type="button" @click="open = true" class="w-full text-left rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 bg-white">
-                                <template x-if="selected.length === 0"><span class="text-gray-400">Pilih produk dikecualikan &hellip;</span></template>
-                                <template x-if="selected.length &gt; 0"><span x-text="selected.length + ' produk dikecualikan'"></span></template>
-                            </button>
-                            <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click="if ($event.target === $el) open = false">
-                                <div @click.stop class="w-full max-w-2xl bg-white rounded-xl p-4">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <input type="search" x-model="q" placeholder="Cari produk..." class="flex-1 rounded-md border px-3 py-2">
-                                        <label class="inline-flex items-center gap-2 text-sm">
-                                            <input type="checkbox" @click="toggleSelectAllFiltered()" :checked="allFilteredSelected">
-                                            <span>Pilih semua (filter)</span>
-                                        </label>
-                                    </div>
-                                    <div class="max-h-64 overflow-auto border rounded-md p-2 space-y-1">
-                                        <template x-for="item in filteredItems" :key="item.id">
-                                            <label class="flex items-center gap-2 p-1 rounded hover:bg-gray-50">
-                                                <input type="checkbox" x-model="selected" :value="item.id">
-                                                <span x-text="item.label" class="text-sm"></span>
-                                            </label>
-                                        </template>
-                                    </div>
-                                    <div class="mt-3 flex items-center justify-between">
-                                        <div class="flex items-center gap-2">
-                                            <button type="button" @click="clearSelection()" class="text-sm text-gray-600">Bersihkan</button>
-                                            <button type="button" @click="selectAll()" class="text-sm text-gray-600">Pilih Semua</button>
-                                        </div>
-                                        <div>
-                                            <button type="button" @click="open=false" class="px-3 py-2 rounded bg-gray-100">Tutup</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <template x-for="id in selected" :key="id"><input type="hidden" :name="name" :value="id"></template>
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                <template x-for="id in selected.slice(0,5)" :key="id"><span class="px-2 py-1 bg-gray-100 rounded text-xs" x-text="getLabel(id)"></span></template>
-                                <template x-if="selected.length &gt; 5"><span class="px-2 py-1 bg-gray-100 rounded text-xs">+<span x-text="selected.length - 5"></span> lainnya</span></template>
-                            </div>
-                        </div>
-
+                <div class="grid grid-cols-1 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-gray-600">Kategori (Include)</label>
                         <div x-data="multiSelectModal({ items: @json($categories->map(fn($c)=>['id'=>$c->id,'label'=>$c->name])), selected: @json(old('included_categories', $includedCategoryIds)), name: 'included_categories[]' })" class="relative">

@@ -25,14 +25,23 @@
     @csrf
     @method('PUT')
 
-    {{-- ── Nama + Kategori ─────────────────────────────────────────── --}}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {{-- ── Nama + SKU + Kategori ───────────────────────────────────── --}}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="space-y-1.5">
             <label for="edit_name_{{ $product->id }}" class="block text-xs font-medium text-gray-600">
                 Nama Produk <span class="text-red-500">*</span>
             </label>
             <input type="text" name="name" id="edit_name_{{ $product->id }}"
                 value="{{ old('name', $product->name) }}" required
+                class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                       placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+        </div>
+        <div class="space-y-1.5">
+            <label for="edit_sku_{{ $product->id }}" class="block text-xs font-medium text-gray-600">
+                SKU <span class="text-red-500">*</span>
+            </label>
+            <input type="text" name="sku" id="edit_sku_{{ $product->id }}"
+                value="{{ old('sku', $product->sku) }}" required
                 class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
                        placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
         </div>

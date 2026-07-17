@@ -18,13 +18,21 @@
 
     @csrf
 
-    {{-- ── Nama + Kategori ─────────────────────────────────────────── --}}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {{-- ── Nama + SKU + Kategori ───────────────────────────────────── --}}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="space-y-1.5">
             <label for="create_name" class="block text-xs font-medium text-gray-600">
                 Nama Produk <span class="text-red-500">*</span>
             </label>
             <input type="text" name="name" id="create_name" placeholder="Contoh: Roti Coklat Premium" required
+                class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+                       placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+        </div>
+        <div class="space-y-1.5">
+            <label for="create_sku" class="block text-xs font-medium text-gray-600">
+                SKU <span class="text-red-500">*</span>
+            </label>
+            <input type="text" name="sku" id="create_sku" placeholder="Contoh: RTI-CHOC-001" required
                 class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
                        placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
         </div>
