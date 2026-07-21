@@ -123,6 +123,39 @@ return new class extends Migration
                 'order_item_id',
             ]);
         });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Product Review Media Table
+        |--------------------------------------------------------------------------
+        | Menyimpan file (gambar/video) dari review produk
+        |--------------------------------------------------------------------------
+        */
+
+        Schema::create('product_review_media', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+
+            $table->foreignUuid('review_id')
+                ->constrained('product_reviews')
+                ->cascadeOnDelete();
+
+            // Path ke file
+            $table->string('media_path');
+
+            // Tipe media
+            // image, video
+            $table->enum('type', [
+                'image',
+                'video',
+            ])->default('image');
+
+            // Urutan tampilan
+            $table->unsignedInteger('sort_order')->default(0);
+
+            $table->timestamps();
+
+            $table->index('review_id');
+        });
     }
 
     /**
@@ -130,6 +163,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('product_review_media');
         Schema::dropIfExists('product_reviews');
     }
 };

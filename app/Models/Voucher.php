@@ -139,7 +139,6 @@ class Voucher extends Model
         // Rule flags
         'allow_on_flash_sale',
         'allow_on_discount',
-        'exclude_digital',
 
         // Combination rules
         'is_combinable',
@@ -210,7 +209,6 @@ class Voucher extends Model
             // Rule flags
             'allow_on_flash_sale' => 'boolean',
             'allow_on_discount' => 'boolean',
-            'exclude_digital' => 'boolean',
 
             // Combination
             'is_combinable' => 'boolean',

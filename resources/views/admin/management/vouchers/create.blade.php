@@ -2,9 +2,11 @@
 <x-layout-admin>
     <!-- Store data in data attributes for JavaScript to read -->
     <div id="voucherData" 
+         data-products="{!! htmlspecialchars(json_encode($products->map(fn($p) => ['id' => (string)$p->id, 'name' => $p->name])->values()), ENT_QUOTES, 'UTF-8') !!}"
          data-categories="{!! htmlspecialchars(json_encode($categories->map(fn($c) => ['id' => (string)$c->id, 'name' => $c->name])->values()), ENT_QUOTES, 'UTF-8') !!}"
          data-shipping="{!! htmlspecialchars(json_encode($shippingMethods->map(fn($s) => ['id' => (string)$s->id, 'courier_name' => $s->courier_name])->values()), ENT_QUOTES, 'UTF-8') !!}"
          data-payment="{!! htmlspecialchars(json_encode($paymentMethods->map(fn($p) => ['id' => (string)$p->id, 'name' => $p->name])->values()), ENT_QUOTES, 'UTF-8') !!}"
+         data-old-product-ids="{{ old('product_ids', '') }}"
          data-old-category-ids="{{ old('category_ids', '') }}"
          data-old-shipping-ids="{{ old('shipping_method_ids', '') }}"
          data-old-payment-ids="{{ old('payment_method_ids', '') }}"
@@ -15,6 +17,9 @@
             const dataEl = document.getElementById('voucherData');
             
             // Parse old values from data attributes
+            const oldProductIds = dataEl.dataset.oldProductIds 
+                ? dataEl.dataset.oldProductIds.split(',').filter(id => id.trim()) 
+                : [];
             const oldCategoryIds = dataEl.dataset.oldCategoryIds 
                 ? dataEl.dataset.oldCategoryIds.split(',').filter(id => id.trim()) 
                 : [];
@@ -25,10 +30,18 @@
                 ? dataEl.dataset.oldPaymentIds.split(',').filter(id => id.trim()) 
                 : [];
             
-            // Parse categories from data attributes
+            // Parse data from data attributes
+            let products = [];
             let categories = [];
             let shipping = [];
             let payment = [];
+            
+            try {
+                products = JSON.parse(dataEl.dataset.products);
+            } catch(e) {
+                console.warn('Could not parse products:', e);
+                products = [];
+            }
             
             try {
                 categories = JSON.parse(dataEl.dataset.categories);
@@ -52,21 +65,32 @@
             }
 
             return {
+                showProductModal: false,
                 showCategoryModal: false,
                 showShippingModal: false,
                 showPaymentModal: false,
 
+                productSearch: '',
                 categorySearch: '',
                 shippingSearch: '',
                 paymentSearch: '',
 
+                selectedProducts: oldProductIds,
                 selectedCategories: oldCategoryIds,
                 selectedShippingMethods: oldShippingIds,
                 selectedPaymentMethods: oldPaymentIds,
 
+                productsList: products,
                 categoriesList: categories,
                 shippingMethodsList: shipping,
                 paymentMethodsList: payment,
+
+                filteredProducts() {
+                    if (!this.productSearch) return this.productsList;
+                    return this.productsList.filter(prod =>
+                        prod.name.toLowerCase().includes(this.productSearch.toLowerCase())
+                    );
+                },
 
                 filteredCategories() {
                     if (!this.categorySearch) return this.categoriesList;
@@ -87,6 +111,30 @@
                     return this.paymentMethodsList.filter(method =>
                         method.name.toLowerCase().includes(this.paymentSearch.toLowerCase())
                     );
+                },
+
+                toggleProduct(id) {
+                    id = String(id);
+                    const index = this.selectedProducts.indexOf(id);
+                    if (index > -1) {
+                        this.selectedProducts.splice(index, 1);
+                    } else {
+                        this.selectedProducts.push(id);
+                    }
+                },
+
+                removeProduct(id) {
+                    id = String(id);
+                    const index = this.selectedProducts.indexOf(id);
+                    if (index > -1) {
+                        this.selectedProducts.splice(index, 1);
+                    }
+                },
+
+                getProductName(id) {
+                    id = String(id);
+                    const prod = this.productsList.find(p => p.id === id);
+                    return prod ? prod.name : 'Unknown';
                 },
 
                 toggleCategory(id) {
@@ -370,6 +418,33 @@
                 <div class="border-t border-gray-100 pt-6">
                     <h3 class="text-sm font-medium text-gray-900 mb-4">Aturan Voucher</h3>
                     
+                    {{-- Produk --}}
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-medium text-gray-600">Produk Berlaku</label>
+                            <button type="button" @click="showProductModal = true"
+                                class="text-xs text-blue-600 hover:text-blue-700 font-medium">
+                                Edit
+                            </button>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3 min-h-[40px]">
+                            <template x-if="selectedProducts.length === 0">
+                                <span class="text-xs text-gray-400">Semua produk</span>
+                            </template>
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="productId in selectedProducts" :key="productId">
+                                    <div class="inline-flex items-center gap-2 bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg text-xs">
+                                        <span x-text="getProductName(productId)"></span>
+                                        <button type="button" @click="removeProduct(productId)" class="text-indigo-700 hover:text-indigo-900">
+                                            ✕
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <input type="hidden" name="product_ids" :value="selectedProducts.join(',')">
+                    </div>
+                    
                     {{-- Kategori --}}
                     <div class="mb-4">
                         <div class="flex items-center justify-between mb-2">
@@ -463,6 +538,49 @@
                 </div>
 
             </form>
+
+            {{-- ── MODAL: PRODUK ──────────────────────────────────────────────────────── --}}
+            <div x-show="showProductModal" x-transition.opacity.duration.200 style="display:none"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <div @click.outside="showProductModal = false" x-transition.scale.origin.center
+            class="w-full max-w-md rounded-2xl bg-white shadow-lg">
+            <div class="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+                <p class="text-sm font-medium text-gray-900">Pilih Produk Berlaku</p>
+                <button @click="showProductModal = false" class="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+            </div>
+            
+            {{-- Search Input --}}
+            <div class="px-6 py-3 border-b border-gray-100">
+                <input type="text" x-model="productSearch" placeholder="Cari produk..."
+                    class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700
+                           placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
+            </div>
+
+            {{-- Items List --}}
+            <div class="space-y-0 max-h-[50vh] overflow-y-auto">
+                <template x-for="product in filteredProducts()" :key="product.id">
+                    <label class="flex items-center gap-3 cursor-pointer px-6 py-3 hover:bg-gray-50 border-b border-gray-50 transition-colors">
+                        <input type="checkbox" :value="String(product.id)" :checked="selectedProducts.includes(String(product.id))"
+                            @change="toggleProduct(String(product.id))"
+                            class="rounded border-gray-300 text-gray-900 shadow-sm focus:border-gray-400 focus:ring-0">
+                        <span class="text-sm text-gray-700" x-text="product.name"></span>
+                    </label>
+                </template>
+            </div>
+
+            {{-- Buttons --}}
+            <div class="flex gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50">
+                <button type="button" @click="selectedProducts = []; productSearch = ''"
+                    class="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+                    Semua
+                </button>
+                <button type="button" @click="showProductModal = false"
+                    class="flex-1 rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors">
+                    Simpan
+                </button>
+            </div>
+        </div>
+    </div>
 
             {{-- ── MODAL: KATEGORI ────────────────────────────────────────────────────── --}}
             <div x-show="showCategoryModal" x-transition.opacity.duration.200 style="display:none"

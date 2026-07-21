@@ -20,7 +20,7 @@
                         <p class="text-xs text-green-600 dark:text-green-400 font-mono truncate" x-text="`Kode: ${voucher.code}`"></p>
                     </div>
                     <div class="flex items-center gap-3 ml-3">
-                        <span class="text-sm font-bold text-green-700 dark:text-green-300 whitespace-nowrap" x-text="`-Rp${voucher.discount?.toLocaleString('id-ID')}`"></span>
+                        <span class="text-sm font-bold text-green-700 dark:text-green-300 whitespace-nowrap" x-text="`-Rp${numberFormat(voucher.discount || 0)}`"></span>
                         <button @click="removeVoucher(voucher.id)" type="button" class="flex-shrink-0 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
@@ -86,17 +86,17 @@
                         </template>
                         <template x-if="!voucher.image_url">
                             <!-- Icon berbeda untuk setiap tipe voucher -->
-                            <template x-if="voucher.discount_type === 'free_shipping'">
+                            <template x-if="voucher.type === 'free_shipping'">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                                 </svg>
                             </template>
-                            <template x-if="voucher.discount_type === 'percent'">
+                            <template x-if="voucher.type === 'percent'">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 0l8-8m-8 8l-8 8" />
                                 </svg>
                             </template>
-                            <template x-if="voucher.discount_type === 'fixed'">
+                            <template x-if="voucher.type === 'fixed'">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 0v8m0-8h-4m4 0h4" />
                                 </svg>
@@ -112,11 +112,11 @@
                                     
                             <!-- Tipe Voucher Badge -->
                             <div class="text-xs font-semibold py-0.5 px-1.5 rounded inline-block" :class="{
-                                'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400': voucher.discount_type === 'free_shipping',
-                                'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400': voucher.discount_type === 'percent',
-                                'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400': voucher.discount_type === 'fixed'
+                                'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400': voucher.type === 'free_shipping',
+                                'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400': voucher.type === 'percent',
+                                'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400': voucher.type === 'fixed'
                             }">
-                                <span x-text="voucher.discount_type === 'free_shipping' ? '🚚 Ongkir Gratis' : voucher.discount_type === 'percent' ? '📊 Diskon %' : '💰 Potongan Harga'"></span>
+                                <span x-text="voucher.type === 'free_shipping' ? '🚚 Ongkir Gratis' : voucher.type === 'percent' ? '📊 Diskon %' : '💰 Potongan Harga'"></span>
                             </div>
                         </div>
 
@@ -143,8 +143,8 @@
                         <div class="absolute top-2 right-2 px-2 py-1 rounded-full bg-red-500 text-white text-xs font-semibold">Habis</div>
                     </template>
 
-                    <template x-if="!voucher.can_apply && voucher.reasons && voucher.reasons.length > 0">
-                        <div class="absolute bottom-2 left-44 right-2 px-1 py-0.5 rounded bg-red-500/90 text-white text-xs font-semibold line-clamp-1" x-text="voucher.reasons[0]"></div>
+                    <template x-if="!voucher.can_apply && voucher.validation_reasons && voucher.validation_reasons.length > 0">
+                        <div class="absolute bottom-2 left-44 right-2 px-1 py-0.5 rounded bg-red-500/90 text-white text-xs font-semibold line-clamp-1" x-text="voucher.validation_reasons[0]"></div>
                     </template>
                 </div>
             </div>
@@ -232,21 +232,21 @@
                 getVoucherValue(voucher) {
                     if (!voucher) return '-';
                     
-                    if (voucher.discount_type === 'free_shipping') {
+                    if (voucher.type === 'free_shipping') {
                         return '🚚 Ongkir Gratis';
-                    } else if (voucher.discount_type === 'percent') {
-                        const value = voucher.discount_value || 0;
+                    } else if (voucher.type === 'percent') {
+                        const value = voucher.value || 0;
                         return `${value}% Diskon`;
-                    } else if (voucher.discount_type === 'fixed') {
-                        const value = voucher.discount_value || 0;
+                    } else if (voucher.type === 'fixed') {
+                        const value = voucher.value || 0;
                         return `Rp${this.numberFormat(value)} Potong`;
                     }
                     return '-';
                 },
 
                 formatDiscount(voucher) {
-                    if (voucher.discount_type === 'percent') return `${voucher.discount_value}%`;
-                    if (voucher.discount_type === 'fixed') return `Rp${this.numberFormat(voucher.discount_value)}`;
+                    if (voucher.type === 'percent') return `${voucher.value}%`;
+                    if (voucher.type === 'fixed') return `Rp${this.numberFormat(voucher.value)}`;
                     return 'Gratis Ongkir';
                 },
 
@@ -272,7 +272,8 @@
                         return;
                     }
                     if (!voucher.can_apply) {
-                        this.error = `❌ ${voucher.reasons?.[0] || 'Voucher tidak bisa digunakan'}`;
+                        const reason = voucher.validation_reasons?.[0] || 'Voucher tidak bisa digunakan';
+                        this.error = `❌ ${reason}`;
                         return;
                     }
                     await this.applyVoucher(voucher);
@@ -280,7 +281,8 @@
 
                 async applyVoucher(voucher) {
                     if (!voucher.can_apply) {
-                        this.error = `❌ ${voucher.reasons?.[0] || 'Voucher tidak bisa digunakan'}`;
+                        const reason = voucher.validation_reasons?.[0] || 'Voucher tidak bisa digunakan';
+                        this.error = `❌ ${reason}`;
                         return;
                     }
                     if (this.isApplied(voucher.id)) {
@@ -314,11 +316,14 @@
                                 id: voucher.id,
                                 name: voucher.name,
                                 code: voucher.code,
+                                type: voucher.type,
                                 discount: discountAmount
                             });
                             this.success = `✓ ${data.message}`;
                             this.voucherCode = '';
                             setTimeout(() => this.notifyCartUpdate(), 1000);
+                            // Refresh available vouchers to update can_apply status
+                            await this.fetchVouchers();
                         } else {
                             this.error = `❌ ${data.message}`;
                         }
@@ -331,11 +336,17 @@
                 },
 
                 calculateDiscount(voucher) {
-                    if (voucher.discount_type === 'percent') {
-                        const discountAmount = (this.subtotal * voucher.discount_value) / 100;
-                        return Math.min(discountAmount, voucher.max_discount || Infinity);
+                    if (voucher.type === 'percent') {
+                        const discountAmount = Math.floor((this.subtotal * voucher.value) / 100);
+                        const maxDiscount = voucher.maximum_discount || Infinity;
+                        return Math.min(discountAmount, maxDiscount);
+                    } else if (voucher.type === 'fixed') {
+                        return voucher.value || 0;
+                    } else if (voucher.type === 'free_shipping') {
+                        // Free shipping discount akan dihitung oleh backend
+                        return voucher.discount_preview?.shipping_discount || 0;
                     }
-                    return voucher.discount_value || 0;
+                    return 0;
                 },
 
                 async removeVoucher(id) {

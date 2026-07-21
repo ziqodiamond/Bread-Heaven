@@ -160,6 +160,44 @@ return new class extends Migration
 
             $table->timestamps();
         });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Flash Sale Items Table
+        |--------------------------------------------------------------------------
+        | Menyimpan produk yang termasuk dalam flash sale
+        |--------------------------------------------------------------------------
+        */
+
+        Schema::create('flash_sale_items', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+
+            $table->foreignUuid('flash_sale_id')
+                ->constrained('flash_sales')
+                ->cascadeOnDelete();
+
+            $table->foreignUuid('product_id')
+                ->constrained('products')
+                ->cascadeOnDelete();
+
+            // Harga promo di flash sale
+            $table->bigInteger('discount_price')->nullable();
+
+            // Stok khusus flash sale
+            $table->unsignedInteger('flash_stock')->default(0);
+
+            // Stok terjual
+            $table->unsignedInteger('stock_sold')->default(0);
+
+            // Urutan tampilan
+            $table->unsignedInteger('sort_order')->default(0);
+
+            $table->timestamps();
+
+            $table->unique(['flash_sale_id', 'product_id']);
+            $table->index(['flash_sale_id']);
+            $table->index(['product_id']);
+        });
     }
 
     /**
@@ -167,6 +205,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('flash_sale_items');
         Schema::dropIfExists('flash_sales');
     }
 };

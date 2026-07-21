@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         /*
@@ -30,21 +27,13 @@ return new class extends Migration
             */
 
             // Nama voucher
-            // Contoh:
-            // Promo Ramadhan
-            // Gratis Ongkir
             $table->string('name');
 
             // Kode voucher
-            // Contoh:
-            // RAMADHAN10
-            // FREESHIP
-            $table->string('code')
-                ->unique();
+            $table->string('code')->unique();
 
             // Deskripsi voucher
-            $table->longText('description')
-                ->nullable();
+            $table->longText('description')->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -52,14 +41,8 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            // fixed         = potongan langsung
-            // percent       = diskon persen
-            // free_shipping = gratis ongkir
-            $table->enum('type', [
-                'fixed',
-                'percent',
-                'free_shipping',
-            ]);
+            // fixed = potongan langsung, percent = diskon persen, free_shipping = gratis ongkir
+            $table->enum('type', ['fixed', 'percent', 'free_shipping']);
 
             /*
             |--------------------------------------------------------------------------
@@ -68,20 +51,13 @@ return new class extends Migration
             */
 
             // Nilai voucher
-            // Contoh:
-            // 10 = 10%
-            // 5000 = Rp5.000
-            $table->bigInteger('value')
-                ->default(0);
+            $table->bigInteger('value')->default(0);
 
-            // Maksimal potongan
-            // Berguna untuk voucher persen
-            $table->bigInteger('maximum_discount')
-                ->nullable();
+            // Maksimal potongan (untuk voucher persen)
+            $table->bigInteger('maximum_discount')->nullable();
 
             // Minimal belanja
-            $table->bigInteger('minimum_purchase')
-                ->default(0);
+            $table->bigInteger('minimum_purchase')->default(0);
 
             /*
             |--------------------------------------------------------------------------
@@ -90,16 +66,13 @@ return new class extends Migration
             */
 
             // Total quota voucher
-            $table->unsignedInteger('quota')
-                ->nullable();
+            $table->unsignedInteger('quota')->nullable();
 
             // Total voucher terpakai
-            $table->unsignedInteger('used_count')
-                ->default(0);
+            $table->unsignedInteger('used_count')->default(0);
 
             // Limit penggunaan per user
-            $table->unsignedInteger('max_usage_per_user')
-                ->default(1);
+            $table->unsignedInteger('max_usage_per_user')->default(1);
 
             /*
             |--------------------------------------------------------------------------
@@ -108,16 +81,10 @@ return new class extends Migration
             */
 
             // Draft / publish
-            $table->enum('status', [
-                'draft',
-                'active',
-                'expired',
-                'disabled',
-            ])->default('draft');
+            $table->enum('status', ['draft', 'active', 'expired', 'disabled'])->default('draft');
 
             // Aktif/nonaktif
-            $table->boolean('is_active')
-                ->default(true);
+            $table->boolean('is_active')->default(true);
 
             /*
             |--------------------------------------------------------------------------
@@ -126,12 +93,10 @@ return new class extends Migration
             */
 
             // Waktu mulai voucher
-            $table->timestamp('start_at')
-                ->nullable();
+            $table->timestamp('start_at')->nullable();
 
             // Waktu selesai voucher
-            $table->timestamp('end_at')
-                ->nullable();
+            $table->timestamp('end_at')->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -140,12 +105,28 @@ return new class extends Migration
             */
 
             // Bisa digabung discount lain
-            $table->boolean('is_stackable')
-                ->default(false);
+            $table->boolean('is_stackable')->default(false);
 
             // Hanya untuk user login
-            $table->boolean('members_only')
-                ->default(false);
+            $table->boolean('members_only')->default(false);
+
+            // Bisa digunakan di flash sale
+            $table->boolean('allow_on_flash_sale')->default(true);
+
+            // Bisa digunakan pada produk dengan discount
+            $table->boolean('allow_on_discount')->default(true);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Kombinasi Voucher
+            |--------------------------------------------------------------------------
+            */
+
+            // Bisa dikombinasikan dengan voucher lain
+            $table->boolean('is_combinable')->default(true);
+
+            // Tipe kombinasi (shipping vs discount)
+            $table->string('combination_type')->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -154,12 +135,13 @@ return new class extends Migration
             */
 
             // Label promo
-            $table->string('label')
-                ->nullable();
+            $table->string('label')->nullable();
 
             // Warna badge
-            $table->string('badge_color')
-                ->nullable();
+            $table->string('badge_color')->nullable();
+
+            // Image untuk voucher card
+            $table->string('image_path')->nullable();
 
             /*
             |--------------------------------------------------------------------------
@@ -168,12 +150,10 @@ return new class extends Migration
             */
 
             // Total views voucher
-            $table->unsignedBigInteger('total_views')
-                ->default(0);
+            $table->unsignedBigInteger('total_views')->default(0);
 
             // Total claim voucher
-            $table->unsignedBigInteger('total_claims')
-                ->default(0);
+            $table->unsignedBigInteger('total_claims')->default(0);
 
             /*
             |--------------------------------------------------------------------------
@@ -181,21 +161,56 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            $table->string('meta_title')
-                ->nullable();
+            $table->string('meta_title')->nullable();
 
-            $table->text('meta_description')
-                ->nullable();
+            $table->text('meta_description')->nullable();
 
+            $table->timestamps();
+        });
+
+        // Voucher <> Products
+        Schema::create('voucher_products', function (Blueprint $table) {
+            $table->id();
+            $table->uuid('voucher_id');
+            $table->uuid('product_id');
+            $table->boolean('is_excluded')->default(false);
+            $table->timestamps();
+        });
+
+        // Voucher <> Categories
+        Schema::create('voucher_categories', function (Blueprint $table) {
+            $table->id();
+            $table->uuid('voucher_id');
+            $table->unsignedBigInteger('category_id');
+            $table->boolean('is_excluded')->default(false);
+            $table->timestamps();
+        });
+
+        // Voucher <> Shipping Methods
+        Schema::create('voucher_shipping_methods', function (Blueprint $table) {
+            $table->id();
+            $table->uuid('voucher_id');
+            $table->uuid('shipping_method_id');
+            $table->boolean('is_excluded')->default(false);
+            $table->timestamps();
+        });
+
+        // Voucher <> Payment Methods
+        Schema::create('voucher_payment_methods', function (Blueprint $table) {
+            $table->id();
+            $table->uuid('voucher_id');
+            $table->uuid('payment_method_id');
+            $table->boolean('is_excluded')->default(false);
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
+        Schema::dropIfExists('voucher_payment_methods');
+        Schema::dropIfExists('voucher_shipping_methods');
+        Schema::dropIfExists('voucher_categories');
+        Schema::dropIfExists('voucher_products');
         Schema::dropIfExists('vouchers');
     }
 };

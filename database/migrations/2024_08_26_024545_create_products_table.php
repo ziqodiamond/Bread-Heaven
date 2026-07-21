@@ -38,8 +38,9 @@ return new class extends Migration
             // SKU produk
             $table->string('sku')->unique();
 
-            // Kategori produk
-            $table->string('category');
+            // Kategori produk (FK to categories)
+            $table->unsignedBigInteger('category_id')->nullable()->after('sku');
+            $table->foreign('category_id')->references('id')->on('categories')->onDelete('set null');
 
             // Deskripsi produk
             $table->longText('description')->nullable();
@@ -101,6 +102,10 @@ return new class extends Migration
             // 10 = 10%
             // 5000 = Rp5.000
             $table->decimal('discount_value', 10, 2)
+                ->nullable();
+
+            // Maksimal potongan diskon (untuk percent type)
+            $table->bigInteger('discount_max')
                 ->nullable();
 
             // Stok produk

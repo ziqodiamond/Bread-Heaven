@@ -11,6 +11,7 @@ use App\Models\ShippingMethod;
 use App\Models\ShippingRate;
 use App\Models\Store;
 use App\Models\UserAddress;
+use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -566,6 +567,40 @@ class CheckoutController extends Controller
         /* ------------------------------------------------------------------ */
         /* Buat Order Items + kurangi stok                                     */
         /* ------------------------------------------------------------------ */
+        $voucherService = app(\App\Services\VoucherService::class);
+
+        // Pre-calculate eligible products per voucher untuk akurat distribute discount
+        $voucherEligibleMap = []; // voucher_id => [product_ids]
+        $productEligibleSubtotal = []; // product_id => subtotal untuk eligible vouchers
+        
+        if (!empty($appliedVouchers)) {
+            foreach ($appliedVouchers as $voucherData) {
+                $voucherId = $voucherData['id'] ?? null;
+                if (!$voucherId) continue;
+                
+                $voucher = Voucher::find($voucherId);
+                if (!$voucher) continue;
+                
+                $eligibleProductIds = [];
+                $eligibleSubtotal = 0;
+                
+                foreach ($cart->items as $item) {
+                    if ($voucherService->isProductEligibleForVoucher($voucher, $item->product_id)) {
+                        $eligibleProductIds[] = $item->product_id;
+                        $eligibleSubtotal += $item->subtotal;
+                    }
+                }
+                
+                if (!empty($eligibleProductIds)) {
+                    $voucherEligibleMap[$voucherId] = [
+                        'product_ids' => $eligibleProductIds,
+                        'subtotal' => $eligibleSubtotal,
+                        'discount_amount' => $voucherData['discount_amount'] ?? 0,
+                    ];
+                }
+            }
+        }
+
         foreach ($cart->items as $item) {
 
             $product = $item->product;
@@ -578,10 +613,25 @@ class CheckoutController extends Controller
                 $discountSource = 'product_discount';
             }
 
-            // Hitung diskon
+            // Hitung diskon produk (flash sale / product discount)
             $originalPrice = $product->price;
             $finalPrice = $product->resolved_price;
             $discountPerItem = max(0, $originalPrice - $finalPrice);
+
+            // Tentukan voucher applicable untuk produk ini dan hitung voucher discount
+            $applicableVoucherIds = [];
+            $totalVoucherDiscount = 0;
+
+            foreach ($voucherEligibleMap as $voucherId => $eligibleData) {
+                if (in_array($product->id, $eligibleData['product_ids'], true)) {
+                    $applicableVoucherIds[] = $voucherId;
+                    
+                    // Proportional discount distribution
+                    // discount_amount : eligible_subtotal = this_item_subtotal : X
+                    $itemDiscount = (int) (($eligibleData['discount_amount'] * $item->subtotal) / max(1, $eligibleData['subtotal']));
+                    $totalVoucherDiscount += $itemDiscount;
+                }
+            }
 
             OrderItem::create([
                 'order_id'   => $order->id,
@@ -601,6 +651,10 @@ class CheckoutController extends Controller
                 'discount_percentage' => $originalPrice > 0 ? (int) round(($discountPerItem / $originalPrice) * 100) : 0,
                 'discount_label'      => $product->discount_label ?? null,
                 'discount_source'     => $discountSource,
+
+                // Voucher info
+                'voucher_ids' => !empty($applicableVoucherIds) ? $applicableVoucherIds : null,
+                'voucher_discount_amount' => $totalVoucherDiscount,
 
                 // Quantity
                 'quantity' => $item->quantity,

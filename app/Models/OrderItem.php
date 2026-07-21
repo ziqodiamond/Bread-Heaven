@@ -84,6 +84,10 @@ class OrderItem extends Model
         'discount_label',
         'discount_source',
 
+        // Voucher info
+        'voucher_ids',
+        'voucher_discount_amount',
+
         /*
         |--------------------------------------------------------------------------
         | Quantity
@@ -167,6 +171,16 @@ class OrderItem extends Model
             'quantity' => 'integer',
 
             'discount_percentage' => 'integer',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Voucher Info
+            |--------------------------------------------------------------------------
+            */
+
+            'voucher_ids' => 'json',
+
+            'voucher_discount_amount' => 'integer',
         ];
     }
 

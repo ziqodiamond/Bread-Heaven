@@ -204,6 +204,8 @@ class VoucherService
 
     /**
      * Validasi kuota dan rules voucher
+     * 
+     * ✅ OPTIMIZED: Gunakan cached rule data untuk menghindari N+1 queries
      */
     private function validateQuotaAndRules(Voucher $voucher, Cart $cart): void
     {
@@ -236,15 +238,18 @@ class VoucherService
             ]);
         }
 
+        // Cache rule data untuk reduce queries
+        $ruleData = $this->loadVoucherRuleData($voucher);
+
         // 5. Products
-        if (!$this->validateProducts($voucher, $cart->items)) {
+        if (!$this->validateProductsWithRules($voucher, $cart->items, $ruleData)) {
             throw ValidationException::withMessages([
                 'voucher' => 'Voucher tidak berlaku untuk produk di keranjang.'
             ]);
         }
 
         // 6. Categories
-        if (!$this->validateCategories($voucher, $cart->items)) {
+        if (!$this->validateCategoriesWithRules($voucher, $cart->items, $ruleData)) {
             throw ValidationException::withMessages([
                 'voucher' => 'Voucher tidak berlaku untuk kategori produk di keranjang.'
             ]);
@@ -281,11 +286,33 @@ class VoucherService
 
     /**
      * Hitung discount dari satu voucher
+     * Hanya menghitung discount untuk produk yang eligible
      */
     private function calculateVoucherDiscount(Voucher $voucher, Cart $cart): array
     {
+        // Filter eligible products
+        $eligibleSubtotal = 0;
+        
+        foreach ($cart->items as $item) {
+            $productId = $item->product_id ?? ($item->product->id ?? null);
+            if (!$productId) continue;
+
+            if ($this->isProductEligibleForVoucher($voucher, $productId)) {
+                $eligibleSubtotal += $item->subtotal;
+            }
+        }
+
+        // Jika tidak ada eligible product, return 0 discount
+        if ($eligibleSubtotal <= 0) {
+            return [
+                'discount_amount' => 0,
+                'shipping_discount' => 0,
+            ];
+        }
+
+        // Hitung discount berdasarkan eligible subtotal
         $shippingCost = $cart->shipping_cost ?? 0;
-        $discountAmount = $voucher->calculateDiscount($cart->subtotal, $shippingCost);
+        $discountAmount = $voucher->calculateDiscount($eligibleSubtotal, $shippingCost);
         $shippingDiscount = $voucher->type === 'free_shipping' ? min($shippingCost, $discountAmount) : 0;
 
         return [
@@ -318,6 +345,113 @@ class VoucherService
 
         // Refresh summary
         $cart->refreshCartSummary();
+    }
+
+    /**
+     * Load voucher rule data sekali untuk caching
+     * Mengembalikan array dengan product/category IDs
+     */
+    private function loadVoucherRuleData(Voucher $voucher): array
+    {
+        return [
+            'included_products' => $voucher->products()
+                ->wherePivot('is_excluded', false)
+                ->distinct()
+                ->select('products.id')
+                ->get()
+                ->pluck('id')
+                ->toArray(),
+            'excluded_products' => $voucher->products()
+                ->wherePivot('is_excluded', true)
+                ->distinct()
+                ->select('products.id')
+                ->get()
+                ->pluck('id')
+                ->toArray(),
+            'included_categories' => $voucher->categories()
+                ->wherePivot('is_excluded', false)
+                ->distinct()
+                ->select('categories.id')
+                ->get()
+                ->pluck('id')
+                ->toArray(),
+            'excluded_categories' => $voucher->categories()
+                ->wherePivot('is_excluded', true)
+                ->distinct()
+                ->select('categories.id')
+                ->get()
+                ->pluck('id')
+                ->toArray(),
+        ];
+    }
+
+    /**
+     * Validasi produk dengan cached rule data
+     */
+    private function validateProductsWithRules(Voucher $voucher, $cartItems, array $ruleData): bool
+    {
+        $included = $ruleData['included_products'];
+        $excluded = $ruleData['excluded_products'];
+
+        if (empty($included) && empty($excluded)) {
+            return true;
+        }
+
+        $hasEligibleProduct = false;
+        
+        foreach ($cartItems as $item) {
+            $productId = $item->product_id ?? ($item->product->id ?? null);
+            if (!$productId) continue;
+
+            if (!empty($included) && !in_array($productId, $included, true)) {
+                continue;
+            }
+
+            if (!empty($excluded) && in_array($productId, $excluded, true)) {
+                continue;
+            }
+
+            $hasEligibleProduct = true;
+            break;
+        }
+
+        return $hasEligibleProduct;
+    }
+
+    /**
+     * Validasi kategori dengan cached rule data
+     */
+    private function validateCategoriesWithRules(Voucher $voucher, $cartItems, array $ruleData): bool
+    {
+        $included = $ruleData['included_categories'];
+        $excluded = $ruleData['excluded_categories'];
+
+        if (empty($included) && empty($excluded)) {
+            return true;
+        }
+
+        $hasEligibleCategory = false;
+        
+        foreach ($cartItems as $item) {
+            $product = $item->product ?? null;
+            if (!$product) continue;
+
+            $catId = $product->category_id ?? null;
+            if (!$catId) continue;
+
+            if (!empty($included) && !in_array($catId, $included, true)) {
+                continue;
+            }
+
+            if (!empty($excluded) && in_array($catId, $excluded, true)) {
+                continue;
+            }
+
+            $hasEligibleCategory = true;
+            break;
+        }
+
+        return $hasEligibleCategory;
     }
 
     /**
@@ -368,40 +502,90 @@ class VoucherService
 
     /**
      * Validasi produk
+     * 
+     * ✅ FIXED: Sekarang check apakah ada MINIMAL 1 produk yang eligible
+     * Jika tidak ada rules, maka semua produk eligible (return true)
+     * Jika ada rules, minimal 1 produk harus memenuhi
      */
     public function validateProducts(Voucher $voucher, $cartItems): bool
     {
-        $included = $voucher->products()->wherePivot('is_excluded', false)->distinct()->select('products.id')->get()->pluck('id')->toArray();
-        $excluded = $voucher->products()->wherePivot('is_excluded', true)->distinct()->select('products.id')->get()->pluck('id')->toArray();
+        $included = $voucher->products()
+            ->wherePivot('is_excluded', false)
+            ->distinct()
+            ->select('products.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
+        
+        $excluded = $voucher->products()
+            ->wherePivot('is_excluded', true)
+            ->distinct()
+            ->select('products.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
 
-        foreach ($cartItems as $item) {
-            $productId = $item->product_id ?? ($item->product->id ?? null);
-            if (!$productId) continue;
-
-            if (!empty($included) && !in_array($productId, $included, true)) {
-                return false;
-            }
-
-            if (!empty($excluded) && in_array($productId, $excluded, true)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Validasi kategori
-     */
-    public function validateCategories(Voucher $voucher, $cartItems): bool
-    {
-        $included = $voucher->categories()->wherePivot('is_excluded', false)->distinct()->select('categories.id')->get()->pluck('id')->toArray();
-        $excluded = $voucher->categories()->wherePivot('is_excluded', true)->distinct()->select('categories.id')->get()->pluck('id')->toArray();
-
+        // Jika tidak ada rules produk sama sekali, voucher berlaku untuk semua
         if (empty($included) && empty($excluded)) {
             return true;
         }
 
+        // Cek minimal 1 produk eligible
+        $hasEligibleProduct = false;
+        
+        foreach ($cartItems as $item) {
+            $productId = $item->product_id ?? ($item->product->id ?? null);
+            if (!$productId) continue;
+
+            // Jika ada included list, produk harus dalam list
+            if (!empty($included) && !in_array($productId, $included, true)) {
+                continue; // Produk ini tidak included
+            }
+
+            // Jika produk dalam excluded list, skip
+            if (!empty($excluded) && in_array($productId, $excluded, true)) {
+                continue; // Produk ini excluded
+            }
+
+            // Produk ini eligible!
+            $hasEligibleProduct = true;
+            break;
+        }
+
+        return $hasEligibleProduct;
+    }
+
+    /**
+     * Validasi kategori
+     * 
+     * ✅ FIXED: Sekarang check apakah ada MINIMAL 1 produk kategori yang eligible
+     */
+    public function validateCategories(Voucher $voucher, $cartItems): bool
+    {
+        $included = $voucher->categories()
+            ->wherePivot('is_excluded', false)
+            ->distinct()
+            ->select('categories.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
+        
+        $excluded = $voucher->categories()
+            ->wherePivot('is_excluded', true)
+            ->distinct()
+            ->select('categories.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
+
+        // Jika tidak ada rules kategori, voucher berlaku untuk semua
+        if (empty($included) && empty($excluded)) {
+            return true;
+        }
+
+        // Cek minimal 1 produk dengan kategori yang eligible
+        $hasEligibleCategory = false;
+        
         foreach ($cartItems as $item) {
             $product = $item->product ?? null;
             if (!$product) continue;
@@ -409,20 +593,28 @@ class VoucherService
             $catId = $product->category_id ?? null;
             if (!$catId) continue;
 
+            // Jika ada included list, kategori harus dalam list
             if (!empty($included) && !in_array($catId, $included, true)) {
-                return false;
+                continue; // Kategori ini tidak included
             }
 
+            // Jika kategori dalam excluded list, skip
             if (!empty($excluded) && in_array($catId, $excluded, true)) {
-                return false;
+                continue; // Kategori ini excluded
             }
+
+            // Kategori ini eligible!
+            $hasEligibleCategory = true;
+            break;
         }
 
-        return true;
+        return $hasEligibleCategory;
     }
 
     /**
      * Validasi shipping method
+     * 
+     * ✅ FIXED: Jika ada rules shipping, metode harus memenuhi
      */
     public function validateShipping(Voucher $voucher, $shippingMethod = null): bool
     {
@@ -430,13 +622,33 @@ class VoucherService
             return true;
         }
 
-        $included = $voucher->shippingMethods()->wherePivot('is_excluded', false)->distinct()->select('shipping_methods.id')->get()->pluck('id')->toArray();
-        $excluded = $voucher->shippingMethods()->wherePivot('is_excluded', true)->distinct()->select('shipping_methods.id')->get()->pluck('id')->toArray();
+        $included = $voucher->shippingMethods()
+            ->wherePivot('is_excluded', false)
+            ->distinct()
+            ->select('shipping_methods.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
+        
+        $excluded = $voucher->shippingMethods()
+            ->wherePivot('is_excluded', true)
+            ->distinct()
+            ->select('shipping_methods.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
 
+        // Jika tidak ada rules, berlaku untuk semua metode
+        if (empty($included) && empty($excluded)) {
+            return true;
+        }
+
+        // Jika ada included list, metode harus dalam list
         if (!empty($included) && !in_array($shippingMethod->id, $included, true)) {
             return false;
         }
 
+        // Jika metode dalam excluded list, tidak berlaku
         if (!empty($excluded) && in_array($shippingMethod->id, $excluded, true)) {
             return false;
         }
@@ -446,6 +658,8 @@ class VoucherService
 
     /**
      * Validasi payment method
+     * 
+     * ✅ FIXED: Jika ada rules payment, metode harus memenuhi
      */
     public function validatePayment(Voucher $voucher, $paymentMethod = null): bool
     {
@@ -453,13 +667,33 @@ class VoucherService
             return true;
         }
 
-        $included = $voucher->paymentMethods()->wherePivot('is_excluded', false)->distinct()->select('payment_methods.id')->get()->pluck('id')->toArray();
-        $excluded = $voucher->paymentMethods()->wherePivot('is_excluded', true)->distinct()->select('payment_methods.id')->get()->pluck('id')->toArray();
+        $included = $voucher->paymentMethods()
+            ->wherePivot('is_excluded', false)
+            ->distinct()
+            ->select('payment_methods.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
+        
+        $excluded = $voucher->paymentMethods()
+            ->wherePivot('is_excluded', true)
+            ->distinct()
+            ->select('payment_methods.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
 
+        // Jika tidak ada rules, berlaku untuk semua metode
+        if (empty($included) && empty($excluded)) {
+            return true;
+        }
+
+        // Jika ada included list, metode harus dalam list
         if (!empty($included) && !in_array($paymentMethod->id, $included, true)) {
             return false;
         }
 
+        // Jika metode dalam excluded list, tidak berlaku
         if (!empty($excluded) && in_array($paymentMethod->id, $excluded, true)) {
             return false;
         }
@@ -568,6 +802,134 @@ class VoucherService
         return [
             'removed' => $removed,
             'kept' => $kept,
+        ];
+    }
+
+    /**
+     * Check voucher eligibility against current cart/shipping/payment
+     * Returns structured array with is_eligible, reasons, and optional discount_info
+     */
+    public function checkVoucherEligibility(Voucher $voucher, Cart $cart = null, $shippingMethod = null, $paymentMethod = null): array
+    {
+        $reasons = [];
+        $isEligible = true;
+
+        // 1. Active / running / date checks
+        if (!$voucher->is_active) {
+            $isEligible = false;
+            $reasons[] = 'Voucher tidak aktif. Silakan cek tanggal atau status voucher.';
+        }
+
+        if ($voucher->start_at && now()->lt($voucher->start_at)) {
+            $isEligible = false;
+            $reasons[] = 'Voucher akan aktif pada ' . $voucher->start_at->toDateTimeString() . '.';
+        }
+
+        if ($voucher->end_at && now()->gt($voucher->end_at)) {
+            $isEligible = false;
+            $reasons[] = 'Voucher sudah kadaluarsa pada ' . $voucher->end_at->toDateTimeString() . '.';
+        }
+
+        // 2. Quota
+        if (!$this->validateQuota($voucher)) {
+            $isEligible = false;
+            $remaining = $voucher->remaining_quota;
+            $reasons[] = 'Kuota voucher sudah habis.' . ($remaining !== null ? " Sisa kuota: {$remaining}." : '');
+        }
+
+        // If cart provided, run cart-related checks
+        if ($cart) {
+            $user = $cart->user ?? auth()->user();
+
+            // Minimum purchase
+            if (isset($voucher->minimum_purchase) && $voucher->minimum_purchase > 0) {
+                if (!$this->validateMinimumPurchase($voucher, $cart->subtotal)) {
+                    $isEligible = false;
+                    $formattedMin = 'Rp' . number_format($voucher->minimum_purchase, 0, ',', '.');
+                    $formattedNow = 'Rp' . number_format($cart->subtotal, 0, ',', '.');
+                    $reasons[] = "Minimum pembelian belum tercapai. Dibutuhkan: {$formattedMin}, subtotal saat ini: {$formattedNow}.";
+                }
+            }
+
+            // User eligibility (members only)
+            if (!$this->validateUser($voucher, $user)) {
+                $isEligible = false;
+                $reasons[] = 'Voucher ini hanya untuk member. Silakan masuk atau daftar untuk menggunakan voucher ini.';
+            }
+
+            // User usage limit
+            if (!$this->validateUserUsageLimit($voucher, $user)) {
+                $isEligible = false;
+                $max = $voucher->max_usage_per_user ?? 1;
+                $reasons[] = "Anda sudah mencapai batas penggunaan voucher ini (maks. {$max} kali).";
+            }
+
+            // Load rule data once
+            $ruleData = $this->loadVoucherRuleData($voucher);
+
+            // Product rules
+            if (!$this->validateProductsWithRules($voucher, $cart->items, $ruleData)) {
+                $isEligible = false;
+                $reasons[] = 'Tidak ada item di keranjang yang memenuhi syarat voucher ini. Periksa syarat produk voucher.';
+            }
+
+            // Category rules
+            if (!$this->validateCategoriesWithRules($voucher, $cart->items, $ruleData)) {
+                $isEligible = false;
+                $reasons[] = 'Tidak ada kategori produk di keranjang yang memenuhi syarat voucher ini. Periksa syarat kategori voucher.';
+            }
+
+            // Shipping method rules
+            $shippingToCheck = $shippingMethod ?? ($cart->selected_shipping_method ?? null);
+            if ($shippingToCheck && !$this->validateShipping($voucher, $shippingToCheck)) {
+                $isEligible = false;
+                $name = $shippingToCheck->name ?? 'metode pengiriman ini';
+                $reasons[] = "Voucher tidak berlaku untuk {$name}.";
+            }
+
+            // Payment method rules
+            $paymentToCheck = $paymentMethod ?? ($cart->selected_payment_method ?? null);
+            if ($paymentToCheck && !$this->validatePayment($voucher, $paymentToCheck)) {
+                $isEligible = false;
+                $pname = $paymentToCheck->name ?? 'metode pembayaran ini';
+                $reasons[] = "Voucher tidak berlaku untuk {$pname}.";
+            }
+
+            // Flash sale / discount product rules
+            if (!$this->validateFlashSale($voucher, $cart->items)) {
+                $isEligible = false;
+                $reasons[] = 'Voucher tidak dapat digunakan untuk produk flash sale.';
+            }
+
+            if (!$this->validateDiscount($voucher, $cart->items)) {
+                $isEligible = false;
+                $reasons[] = 'Voucher tidak dapat digunakan untuk produk yang sedang diskon.';
+            }
+        } else {
+            // No cart: still validate user, quota and date handled above
+            $user = auth()->user() ?? null;
+            if (!$this->validateUser($voucher, $user)) {
+                $isEligible = false;
+                $reasons[] = 'Voucher ini hanya untuk member. Silakan masuk atau daftar untuk menggunakan voucher ini.';
+            }
+
+            if (!$this->validateUserUsageLimit($voucher, $user)) {
+                $isEligible = false;
+                $max = $voucher->max_usage_per_user ?? 1;
+                $reasons[] = "Anda sudah mencapai batas penggunaan voucher ini (maks. {$max} kali).";
+            }
+        }
+
+        // Discount preview if eligible and cart present
+        $discountInfo = null;
+        if ($isEligible && $cart) {
+            $discountInfo = $this->calculateVoucherDiscount($voucher, $cart);
+        }
+
+        return [
+            'is_eligible' => $isEligible,
+            'reasons' => $reasons,
+            'discount_info' => $discountInfo,
         ];
     }
 
@@ -692,5 +1054,77 @@ class VoucherService
                 'members_only' => $v->members_only ?? false,
                 'max_usage_per_user' => $v->max_usage_per_user ?? 1,
             ]);
+    }
+
+    /**
+     * Get eligible product IDs untuk voucher tertentu
+     * Returns array of product IDs yang dapat mendapat discount dari voucher
+     */
+    public function getEligibleProductIds(Voucher $voucher): array
+    {
+        $included = $voucher->products()
+            ->wherePivot('is_excluded', false)
+            ->distinct()
+            ->select('products.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
+
+        $excluded = $voucher->products()
+            ->wherePivot('is_excluded', true)
+            ->distinct()
+            ->select('products.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
+
+        if (empty($included) && empty($excluded)) {
+            return [];
+        }
+
+        if (!empty($included)) {
+            return array_diff($included, $excluded);
+        }
+
+        return [];
+    }
+
+    /**
+     * Check apakah produk eligible untuk voucher
+     * 
+     * ✅ REFACTORED: Simplified logic dengan included/excluded rules
+     */
+    public function isProductEligibleForVoucher(Voucher $voucher, string $productId): bool
+    {
+        $included = $voucher->products()
+            ->wherePivot('is_excluded', false)
+            ->distinct()
+            ->select('products.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
+
+        $excluded = $voucher->products()
+            ->wherePivot('is_excluded', true)
+            ->distinct()
+            ->select('products.id')
+            ->get()
+            ->pluck('id')
+            ->toArray();
+
+        // Jika tidak ada rules, semua produk eligible
+        if (empty($included) && empty($excluded)) {
+            return true;
+        }
+
+        // Jika ada included list, produk harus dalam list dan tidak excluded
+        if (!empty($included)) {
+            return in_array($productId, $included, true) && 
+                   !in_array($productId, $excluded, true);
+        }
+
+        // Jika hanya ada excluded list (tanpa included), tidak valid
+        // Return false untuk safety (hanya included list yang didukung)
+        return false;
     }
 }

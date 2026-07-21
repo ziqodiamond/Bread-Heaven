@@ -186,6 +186,23 @@ return new class extends Migration
             $table->bigInteger('voucher_value')
                 ->nullable();
 
+            // Snapshot data voucher lengkap (JSON)
+            $table->json('voucher_snapshot')
+                ->nullable();
+
+            // Array vouchers yang diterapkan (JSON)
+            $table->json('vouchers')
+                ->nullable()
+                ->default(null);
+
+            // Total discount dari semua voucher
+            $table->bigInteger('total_discount_amount')
+                ->default(0);
+
+            // Total shipping discount dari voucher
+            $table->bigInteger('total_shipping_discount')
+                ->default(0);
+
             /*
             |--------------------------------------------------------------------------
             | Informasi Discount

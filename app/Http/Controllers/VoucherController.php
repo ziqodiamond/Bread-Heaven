@@ -172,7 +172,8 @@ class VoucherController extends Controller
     }
 
     /**
-     * List available vouchers dengan detailed info (can_apply, reasons, etc)
+     * Get available vouchers dengan validation untuk checkout
+     * GET /cart/vouchers/available?shipping_method_id=xxx&payment_method_id=yyy
      */
     public function available(Request $request): JsonResponse
     {
@@ -181,59 +182,61 @@ class VoucherController extends Controller
             $user = auth()->user();
             $cart = $user ? Cart::where('user_id', $user->id)->first() : null;
 
-            $vouchers = $this->voucherService->getAvailableVouchers($limit);
+            // Get shipping & payment methods jika dikirimkan di query
+            $shipping = null;
+            $payment = null;
+            
+            if ($request->has('shipping_method_id')) {
+                $shipping = \App\Models\ShippingMethod::find($request->shipping_method_id);
+            }
+            
+            if ($request->has('payment_method_id')) {
+                $payment = \App\Models\PaymentMethod::find($request->payment_method_id);
+            }
 
-            // Enrich with applicability check
+            // Get voucher models so we can pass to service
+            $vouchers = \App\Models\Voucher::valid()
+                ->where('is_active', true)
+                ->orderBy('created_at', 'desc')
+                ->limit($limit)
+                ->get();
+
             $appliedIds = [];
             if ($cart) {
                 $applied = $cart->vouchers ?? [];
                 $appliedIds = array_column($applied, 'id');
             }
 
-            $vouchersWithStatus = $vouchers->map(function ($voucher) use ($cart, $user) {
-                $canApply = true;
-                $reasons = [];
+            $vouchersWithStatus = $vouchers->map(function ($voucher) use ($cart, $shipping, $payment) {
+                $elig = $this->voucherService->checkVoucherEligibility(
+                    $voucher, 
+                    $cart, 
+                    $shipping ?? ($cart->selected_shipping_method ?? null), 
+                    $payment ?? ($cart->selected_payment_method ?? null)
+                );
 
-                if ($cart && $cart->items) {
-                    // Check kuota
-                    if (!$voucher['quota'] || $voucher['used_count'] >= $voucher['quota']) {
-                        $canApply = false;
-                        $reasons[] = 'Kuota voucher sudah habis';
-                    }
-
-                    // Check minimum purchase
-                    if ($voucher['minimum_purchase'] && $cart->subtotal < $voucher['minimum_purchase']) {
-                        $canApply = false;
-                        $reasons[] = 'Minimal pembelian Rp' . number_format($voucher['minimum_purchase'], 0, ',', '.');
-                    }
-
-                    // Check user eligibility
-                    if ($voucher['members_only'] && !$user) {
-                        $canApply = false;
-                        $reasons[] = 'Voucher ini hanya untuk member';
-                    }
-
-                    // Check user usage limit
-                    if ($user) {
-                        $usageCount = \App\Models\VoucherUsage::where('voucher_id', $voucher['id'])
-                            ->where('user_id', $user->id)
-                            ->where('status', 'used')
-                            ->count();
-
-                        $maxUsage = $voucher['max_usage_per_user'] ?? 1;
-                        if ($usageCount >= $maxUsage) {
-                            $canApply = false;
-                            $reasons[] = 'Anda sudah mencapai batas penggunaan voucher ini';
-                        }
-                    }
-                }
-
-                return array_merge($voucher, [
-                    'can_apply' => $canApply,
-                    'reasons' => $reasons,
-                    'quota' => $voucher['remaining_quota'] ?? 0,
-                    'used_count' => $voucher['used_count'] ?? 0,
-                ]);
+                return [
+                    'id' => $voucher->id,
+                    'code' => $voucher->code,
+                    'name' => $voucher->name,
+                    'description' => $voucher->description,
+                    'type' => $voucher->type,
+                    'type_label' => $voucher->type_label,
+                    'value' => $voucher->value,
+                    'maximum_discount' => $voucher->maximum_discount,
+                    'badge_color' => $voucher->badge_color ?? '#FF6B6B',
+                    'image_url' => $voucher->image_url,
+                    'minimum_purchase' => $voucher->minimum_purchase ?? 0,
+                    'members_only' => $voucher->members_only ?? false,
+                    'max_usage_per_user' => $voucher->max_usage_per_user ?? 1,
+                    'is_active' => $voucher->is_active,
+                    'is_expired' => $voucher->is_expired,
+                    'is_sold_out' => $voucher->is_sold_out,
+                    'remaining_quota' => $voucher->remaining_quota,
+                    'can_apply' => $elig['is_eligible'],
+                    'validation_reasons' => $elig['reasons'],
+                    'discount_preview' => $elig['discount_info'],
+                ];
             });
 
             // Exclude already applied vouchers
@@ -241,7 +244,7 @@ class VoucherController extends Controller
                 return in_array($v['id'], $appliedIds, true);
             })->values();
 
-            // Sort: usable first, then not usable
+            // Sort usable first
             $sorted = collect([
                 ...$filtered->filter(fn($v) => $v['can_apply'] === true)->values(),
                 ...$filtered->filter(fn($v) => $v['can_apply'] === false)->values(),
@@ -252,6 +255,134 @@ class VoucherController extends Controller
                 'data' => $sorted->values()->toArray(),
             ]);
 
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Return ALL active vouchers with validation against current cart
+     * GET /cart/vouchers/list-with-validation
+     */
+    public function listWithValidation(Request $request): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $cart = $user ? Cart::where('user_id', $user->id)->first() : null;
+
+            $vouchers = \App\Models\Voucher::valid()
+                ->where('is_active', true)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $result = $vouchers->map(function ($voucher) use ($cart) {
+                $elig = $this->voucherService->checkVoucherEligibility($voucher, $cart, $cart->selected_shipping_method ?? null, $cart->selected_payment_method ?? null);
+
+                return [
+                    'basic' => [
+                        'id' => $voucher->id,
+                        'code' => $voucher->code,
+                        'name' => $voucher->name,
+                        'type' => $voucher->type,
+                        'value' => $voucher->value,
+                        'badge_color' => $voucher->badge_color ?? '#FF6B6B',
+                        'image_url' => $voucher->image_url,
+                        'description' => $voucher->description,
+                    ],
+                    'rules' => [
+                        'minimum_purchase' => $voucher->minimum_purchase ?? 0,
+                        'members_only' => $voucher->members_only ?? false,
+                        'max_usage_per_user' => $voucher->max_usage_per_user ?? 1,
+                    ],
+                    'status' => [
+                        'is_active' => $voucher->is_active,
+                        'is_expired' => $voucher->is_expired,
+                        'remaining_quota' => $voucher->remaining_quota,
+                    ],
+                    'eligibility' => [
+                        'can_apply' => $elig['is_eligible'],
+                        'validation_reasons' => $elig['reasons'],
+                        'discount_preview' => $elig['discount_info'],
+                    ],
+                ];
+            })->toArray();
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * POST /cart/vouchers/check-eligibility-batch
+     * Accepts: voucher_ids: array, optional shipping_method_id, payment_method_id
+     */
+    public function checkEligibilityBatch(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'voucher_ids' => 'required|array',
+                'voucher_ids.*' => 'string',
+                'shipping_method_id' => 'nullable|string',
+                'payment_method_id' => 'nullable|string',
+            ]);
+
+            $user = auth()->user();
+            $cart = $user ? Cart::where('user_id', $user->id)->first() : null;
+
+            $shipping = null;
+            $payment = null;
+
+            if ($request->shipping_method_id) {
+                $shipping = \App\Models\ShippingMethod::find($request->shipping_method_id);
+            }
+
+            if ($request->payment_method_id) {
+                $payment = \App\Models\PaymentMethod::find($request->payment_method_id);
+            }
+
+            $results = [];
+            foreach ($request->voucher_ids as $vid) {
+                $voucher = \App\Models\Voucher::find($vid);
+                if (!$voucher) {
+                    $results[] = [
+                        'id' => $vid,
+                        'is_eligible' => false,
+                        'validation_reasons' => ['Voucher tidak ditemukan.'],
+                    ];
+                    continue;
+                }
+
+                $elig = $this->voucherService->checkVoucherEligibility($voucher, $cart, $shipping, $payment);
+
+                $results[] = array_merge([
+                    'id' => $voucher->id,
+                    'code' => $voucher->code,
+                    'name' => $voucher->name,
+                ], $elig);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $results,
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validasi gagal.',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

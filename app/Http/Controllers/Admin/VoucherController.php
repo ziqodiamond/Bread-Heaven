@@ -210,6 +210,7 @@ class VoucherController extends Controller
             'image_path'         => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
 
             // New comma-separated string format
+            'product_ids'       => 'nullable|string',
             'category_ids'       => 'nullable|string',
             'shipping_method_ids' => 'nullable|string',
             'payment_method_ids' => 'nullable|string',
@@ -267,6 +268,19 @@ class VoucherController extends Controller
      */
     protected function syncRelationsFromRequest(Voucher $voucher, Request $request): void
     {
+        // Products - new format with comma-separated IDs
+        if ($request->filled('product_ids')) {
+            $productIds = array_filter(explode(',', $request->input('product_ids')));
+            $sync = [];
+            foreach ($productIds as $id) {
+                $sync[$id] = ['is_excluded' => false];
+            }
+            $voucher->products()->sync($sync);
+        } elseif ($request->has('product_ids')) {
+            // Empty string means clear all
+            $voucher->products()->sync([]);
+        }
+
         // Categories - new format with comma-separated IDs
         if ($request->filled('category_ids')) {
             $categoryIds = array_filter(explode(',', $request->input('category_ids')));

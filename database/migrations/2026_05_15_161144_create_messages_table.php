@@ -176,6 +176,48 @@ return new class extends Migration
                 ->on('messages')
                 ->nullOnDelete();
         });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Message Attachments Table
+        |--------------------------------------------------------------------------
+        | Menyimpan file attachment dari message
+        |--------------------------------------------------------------------------
+        */
+
+        Schema::create('message_attachments', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+
+            $table->foreignUuid('message_id')
+                ->constrained('messages')
+                ->cascadeOnDelete();
+
+            // Nama file asli
+            $table->string('file_name');
+
+            // Path ke file
+            $table->string('file_path');
+
+            // Ukuran file dalam byte
+            $table->unsignedBigInteger('file_size');
+
+            // MIME type
+            $table->string('mime_type');
+
+            // Tipe file
+            // image, document, video, audio, other
+            $table->enum('type', [
+                'image',
+                'document',
+                'video',
+                'audio',
+                'other',
+            ])->default('other');
+
+            $table->timestamps();
+
+            $table->index(['message_id']);
+        });
     }
 
     /**
@@ -183,6 +225,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('message_attachments');
         Schema::dropIfExists('messages');
     }
 };

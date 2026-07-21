@@ -273,13 +273,8 @@ class Product extends Model
                 }
             )
 
-            ->where(
-                'is_active',
-                true
-            )
-
             ->whereRaw(
-                'sold_quantity < stock_limit'
+                'stock_sold < flash_stock'
             );
     }
 

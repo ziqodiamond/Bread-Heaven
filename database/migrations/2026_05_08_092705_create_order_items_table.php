@@ -107,6 +107,15 @@ return new class extends Migration
             $table->string('discount_source')
                 ->nullable();
 
+            // IDs voucher yang applicable ke produk ini (JSON array)
+            $table->json('voucher_ids')
+                ->nullable()
+                ->default(null);
+
+            // Total discount dari voucher untuk item ini
+            $table->bigInteger('voucher_discount_amount')
+                ->default(0);
+
             /*
             |--------------------------------------------------------------------------
             | Informasi Quantity
