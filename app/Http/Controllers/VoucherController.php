@@ -215,6 +215,15 @@ class VoucherController extends Controller
                     $payment ?? ($cart->selected_payment_method ?? null)
                 );
 
+                // Calculate user's remaining quota for this voucher
+                $userUsageCount = \App\Models\VoucherUsage::where('voucher_id', $voucher->id)
+                    ->where('user_id', auth()->id())
+                    ->where('status', 'used')
+                    ->count();
+                
+                $maxUsagePerUser = $voucher->max_usage_per_user ?? 1;
+                $userRemainingQuota = max(0, $maxUsagePerUser - $userUsageCount);
+
                 return [
                     'id' => $voucher->id,
                     'code' => $voucher->code,
@@ -228,11 +237,12 @@ class VoucherController extends Controller
                     'image_url' => $voucher->image_url,
                     'minimum_purchase' => $voucher->minimum_purchase ?? 0,
                     'members_only' => $voucher->members_only ?? false,
-                    'max_usage_per_user' => $voucher->max_usage_per_user ?? 1,
+                    'max_usage_per_user' => $maxUsagePerUser,
                     'is_active' => $voucher->is_active,
                     'is_expired' => $voucher->is_expired,
                     'is_sold_out' => $voucher->is_sold_out,
                     'remaining_quota' => $voucher->remaining_quota,
+                    'user_remaining_quota' => $userRemainingQuota,
                     'can_apply' => $elig['is_eligible'],
                     'validation_reasons' => $elig['reasons'],
                     'discount_preview' => $elig['discount_info'],
