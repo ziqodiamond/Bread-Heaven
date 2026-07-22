@@ -449,6 +449,7 @@
             selectedAddress: @json($defaultAddressId),
             subtotal: {{ (int) $subtotal }},
             totalWeight: {{ (int) $totalWeight }},
+            totalVoucherDiscount: {{ (int) ($totalVoucherDiscount ?? 0) }},
         };
     </script>
 
@@ -477,6 +478,7 @@
         totalWeight: 0,
         paymentFees: {},
         selectedShippingIsFree: false,
+        totalVoucherDiscount: 0,
     
         get paymentFee() {
             if (!this.selectedPayment) return 0;
@@ -523,7 +525,8 @@
         get total() {
             return this.subtotal +
                 (this.deliveryMode === 'delivery' ? this.shippingPrice : 0) +
-                this.paymentFee;
+                this.paymentFee -
+                this.totalVoucherDiscount;
         },
     
         get canSubmit() {
@@ -599,11 +602,17 @@
             this.selectedAddress = d.selectedAddress ?? null;
             this.subtotal = d.subtotal ?? 0;
             this.totalWeight = d.totalWeight ?? 0;
+            this.totalVoucherDiscount = d.totalVoucherDiscount ?? 0;
     
             // Auto-fetch ongkir jika sudah ada alamat default
             if (this.deliveryMode === 'delivery' && this.selectedAddress) {
                 this.fetchRates(this.selectedAddress);
             }
+
+            // Listen for voucher updates
+            window.addEventListener('voucherApplied', (event) => {
+                this.totalVoucherDiscount = event.detail?.totalDiscount || 0;
+            });
         }
     }">
 
@@ -1009,7 +1018,7 @@
                         </div>
                     </div>
 
-                    {{-- VOUCHER & PROMO --}}
+                    {{-- VOUCHER & PROMO + CATATAN --}}
                     <div class="section-card">
                         <div class="section-header">
                             <div class="flex items-center gap-3">
@@ -1017,27 +1026,19 @@
                                 <h2>Voucher & Promo</h2>
                             </div>
                         </div>
-                        <div class="p-6">
-                            <x-checkout-voucher-optimized 
+                        <div class="p-6 space-y-6 border-b border-gray-200 dark:border-gray-700 pb-6">
+                            <x-checkout-voucher 
                                 :appliedVouchers="$appliedVouchers ?? []"
                                 :subtotal="$subtotal ?? 0"
                                 :cartTotal="$cartTotal ?? $subtotal"
                             />
                         </div>
-                    </div>
-
-                    {{-- CATATAN --}}
-                    <div class="section-card">
-                        <div class="section-header">
-                            <div class="flex items-center gap-3">
-                                <div class="step-num" x-text="deliveryMode === 'pickup' ? '4' : '5'"></div>
-                                <h2>Catatan</h2>
-                            </div>
-                            <span class="text-xs text-gray-400">Opsional</span>
-                        </div>
                         <div class="p-6">
-                            <textarea name="notes" rows="3" placeholder="Contoh: Tolong packing lebih aman, hindari banting"
-                                class="note-textarea"></textarea>
+                            <div class="space-y-2">
+                                <label class="text-sm font-semibold text-gray-900 dark:text-white">Catatan Pesanan <span class="text-xs text-gray-400">(Opsional)</span></label>
+                                <textarea name="notes" rows="3" placeholder="Contoh: Tolong packing lebih aman, hindari banting"
+                                    class="note-textarea"></textarea>
+                            </div>
                         </div>
                     </div>
 
@@ -1105,18 +1106,10 @@
                             </div>
 
                             <!-- Voucher Discount Display -->
-                            @php
-                                $totalDiscount = ($cart->total_discount_amount ?? 0) + ($cart->total_shipping_discount ?? 0);
-                            @endphp
-
-                            @if ($totalDiscount > 0)
-                                <div class="flex items-center justify-between mb-3">
-                                    <span class="text-sm text-gray-400">Diskon Voucher</span>
-                                    <span class="text-sm font-medium text-green-600 dark:text-green-400">
-                                        -Rp {{ number_format($totalDiscount, 0, ',', '.') }}
-                                    </span>
-                                </div>
-                            @endif
+                            <div x-show="totalVoucherDiscount > 0" x-transition class="flex items-center justify-between mb-3">
+                                <span class="text-sm text-gray-400">Diskon Voucher</span>
+                                <span class="text-sm font-medium text-green-600 dark:text-green-400" x-text="formatRp(totalVoucherDiscount)"></span>
+                            </div>
 
                             <div class="flex items-center justify-between mb-3" x-show="paymentFee > 0">
                                 <span class="text-sm text-gray-400">Biaya Layanan</span>

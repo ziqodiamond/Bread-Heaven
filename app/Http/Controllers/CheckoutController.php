@@ -124,6 +124,8 @@ class CheckoutController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        $totalVoucherDiscount = ($cart->total_discount_amount ?? 0) + ($cart->total_shipping_discount ?? 0);
+
         return view('checkout.index', compact(
             'cart',
             'addresses',
@@ -133,6 +135,7 @@ class CheckoutController extends Controller
             'totalWeight',
             'checkoutMode',
             'appliedVouchers',
+            'totalVoucherDiscount',
         ));
     }
 
