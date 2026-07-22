@@ -274,7 +274,7 @@ class Product extends Model
             )
 
             ->whereRaw(
-                'stock_sold < flash_stock'
+                'sold_quantity < stock_limit'
             );
     }
 

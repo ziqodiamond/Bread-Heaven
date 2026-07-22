@@ -16,7 +16,7 @@ class CategorySeeder extends Seeder
     {
         $categories = [
             [
-                'name' => 'Roti Tawar',
+                'name' => 'Roti',
                 'description' => 'Koleksi roti tawar berkualitas tinggi',
                 'icon' => '🍞',
                 'sort_order' => 1,
@@ -34,12 +34,6 @@ class CategorySeeder extends Seeder
                 'sort_order' => 3,
             ],
             [
-                'name' => 'Donat',
-                'description' => 'Donat dengan berbagai rasa',
-                'icon' => '🍩',
-                'sort_order' => 4,
-            ],
-            [
                 'name' => 'Snack',
                 'description' => 'Camilan ringan dan gurih',
                 'icon' => '🍪',
@@ -51,6 +45,19 @@ class CategorySeeder extends Seeder
                 'icon' => '🧁',
                 'sort_order' => 6,
             ],
+            [
+                'name' => 'Makanan Innstan',
+                'description' => '',
+                'icon' => '',
+                'sort_order' => 7,
+            ],
+            [
+                'name' => 'Elektronik',
+                'description' => '',
+                'icon' => '',
+                'sort_order' => 8,
+            ],
+
         ];
 
         foreach ($categories as $category) {
@@ -65,4 +72,3 @@ class CategorySeeder extends Seeder
         }
     }
 }
-

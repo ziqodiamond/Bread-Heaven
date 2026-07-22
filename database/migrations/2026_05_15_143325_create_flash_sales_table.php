@@ -180,17 +180,83 @@ return new class extends Migration
                 ->constrained('products')
                 ->cascadeOnDelete();
 
-            // Harga promo di flash sale
-            $table->bigInteger('discount_price')->nullable();
+            /*
+            |--------------------------------------------------------------------------
+            | Snapshot Produk saat ditambah ke flash sale
+            |--------------------------------------------------------------------------
+            */
 
-            // Stok khusus flash sale
-            $table->unsignedInteger('flash_stock')->default(0);
+            // Nama produk snapshot
+            $table->string('product_name');
 
-            // Stok terjual
-            $table->unsignedInteger('stock_sold')->default(0);
+            // SKU produk snapshot
+            $table->string('product_sku');
+
+            // URL gambar produk snapshot
+            $table->string('product_image_url')->nullable();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Harga Flash Sale
+            |--------------------------------------------------------------------------
+            */
+
+            // Harga normal produk saat ditambah
+            $table->bigInteger('original_price');
+
+            // Harga promo flash sale
+            $table->bigInteger('sale_price');
+
+            // Tipe diskon
+            $table->enum('discount_type', ['percent', 'fixed'])->default('fixed');
+
+            // Nilai diskon
+            $table->bigInteger('discount_value');
+
+            // Persentase diskon
+            $table->unsignedInteger('discount_percentage')->default(0);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Stock Flash Sale
+            |--------------------------------------------------------------------------
+            */
+
+            // Stok terbatas untuk flash sale
+            $table->unsignedInteger('stock_limit')->default(0);
+
+            // Jumlah stok terjual
+            $table->unsignedInteger('sold_quantity')->default(0);
+
+            // Batas pembelian per user
+            $table->unsignedInteger('max_purchase_per_user')->default(10);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Status
+            |--------------------------------------------------------------------------
+            */
+
+            // Item aktif/nonaktif
+            $table->boolean('is_active')->default(true);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Urutan & Analytics
+            |--------------------------------------------------------------------------
+            */
 
             // Urutan tampilan
             $table->unsignedInteger('sort_order')->default(0);
+
+            // Label badge opsional
+            $table->string('badge_label')->nullable();
+
+            // Total views item
+            $table->unsignedBigInteger('total_views')->default(0);
+
+            // Total checkouts
+            $table->unsignedBigInteger('total_checkouts')->default(0);
 
             $table->timestamps();
 
