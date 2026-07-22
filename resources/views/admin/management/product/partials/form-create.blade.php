@@ -1,8 +1,7 @@
 {{-- resources/views/admin/management/product/partials/form-create.blade.php --}}
 {{-- Tidak ada x-data di sini — semua state dari productManager() --}}
 
-<form action="{{ route('admin.management.products.store') }}" method="POST" enctype="multipart/form-data"
-    class="space-y-5"
+<form action="{{ route('admin.management.products.store') }}" method="POST" enctype="multipart/form-data" class="space-y-5"
     x-data="{ discountEnabled: false }"
     @submit="
         const checkbox = document.querySelector('input[name=enable_discount]');
@@ -63,25 +62,25 @@
 
     {{-- ── Harga + Stok ─────────────────────────────────────────────── --}}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-       <div class="space-y-1.5">
-           <label for="create_price" class="block text-xs font-medium text-gray-600">
-               Harga <span class="text-red-500">*</span>
-           </label>
-           <div class="relative">
-               <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
-               <input type="number" name="price" id="create_price" min="0" placeholder="0" required
-                   class="w-full rounded-xl border border-gray-200 pl-10 pr-3 py-2.5 text-sm text-gray-700
+        <div class="space-y-1.5">
+            <label for="create_price" class="block text-xs font-medium text-gray-600">
+                Harga <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
+                <input type="number" name="price" id="create_price" min="0" placeholder="0" required
+                    class="w-full rounded-xl border border-gray-200 pl-10 pr-3 py-2.5 text-sm text-gray-700
                           placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
-           </div>
-       </div>
-       <div class="space-y-1.5">
-           <label for="create_stock" class="block text-xs font-medium text-gray-600">
-               Stok <span class="text-red-500">*</span>
-           </label>
-           <input type="number" name="stock" id="create_stock" min="0" placeholder="0" required
-               class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
+            </div>
+        </div>
+        <div class="space-y-1.5">
+            <label for="create_stock" class="block text-xs font-medium text-gray-600">
+                Stok <span class="text-red-500">*</span>
+            </label>
+            <input type="number" name="stock" id="create_stock" min="0" placeholder="0" required
+                class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
                       placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-0">
-       </div>
+        </div>
     </div>
 
     {{-- ── Berat + Dimensi ──────────────────────────────────────────── --}}
@@ -157,18 +156,20 @@
             salePriceId: 'create_sale_price',
             discountTypeId: 'create_discount_type',
             discountValueId: 'create_discount_value',
-            discountInfoId: 'create_discount_info'
-        })"
-        x-show="discountEnabled"
-        class="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 py-3 bg-gray-50 rounded-xl">
-            
+            discountInfoId: 'create_discount_info',
+            initialPrice: 0,
+            initialSalePrice: null,
+            initialType: '',
+            initialValue: null
+        })" x-show="discountEnabled"
+            class="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 py-3 bg-gray-50 rounded-xl">
+
             {{-- Tipe Diskon --}}
             <div class="space-y-1.5">
                 <label for="create_discount_type" class="block text-xs font-medium text-gray-600">
                     Tipe Diskon
                 </label>
-                <select id="create_discount_type" name="discount_type"
-                    @change="updateType($event)"
+                <select id="create_discount_type" name="discount_type" @change="updateType($event)"
                     class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700
                            focus:border-gray-400 focus:outline-none focus:ring-0">
                     <option value="">-- Pilih Tipe --</option>
@@ -180,7 +181,8 @@
             {{-- Nilai Diskon --}}
             <div class="space-y-1.5">
                 <label for="create_discount_value" class="block text-xs font-medium text-gray-600">
-                    Nilai Diskon <span class="text-gray-400" x-text="discountType === 'percent' ? '(%)' : '(Rp)'"></span>
+                    Nilai Diskon <span class="text-gray-400"
+                        x-text="discountType === 'percent' ? '(%)' : '(Rp)'"></span>
                 </label>
                 <input type="number" id="create_discount_value" name="discount_value"
                     @input="updateFromDiscount($event)" min="0" step="0.01"
@@ -205,7 +207,8 @@
             </div>
 
             {{-- Info Message --}}
-            <div id="create_discount_info" class="md:col-span-2 text-xs text-gray-600 p-2 bg-blue-50 rounded-lg" x-show="infoMsg" x-text="infoMsg"></div>
+            <div id="create_discount_info" class="md:col-span-2 text-xs text-gray-600 p-2 bg-blue-50 rounded-lg"
+                x-show="infoMsg" x-text="infoMsg"></div>
 
             {{-- Label Diskon --}}
             <div class="space-y-1.5 md:col-span-2">
