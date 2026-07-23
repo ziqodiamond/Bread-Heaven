@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\PaymentTransaction;
 use App\Models\Shipment;
 use App\Services\MidtransService;
 use Illuminate\Http\Request;
@@ -256,6 +257,46 @@ class AdminOrderController extends Controller
         return back()->with(
             'success',
             'Refund berhasil diproses.'
+        );
+    }
+
+    /**
+     * Mark order as paid manually (for testing/webhook failures)
+     */
+    public function markAsPaid(string $id)
+    {
+        $order = Order::findOrFail($id);
+
+        if ($order->payment_status === 'paid') {
+            return back()->with(
+                'error',
+                'Order sudah dibayar.'
+            );
+        }
+
+        DB::transaction(function () use ($order) {
+            // Mark order as paid
+            $order->markAsPaid();
+
+            // Create payment transaction record for manual payment
+            PaymentTransaction::create([
+                'order_id' => $order->id,
+                'gateway' => 'manual',
+                'gateway_transaction_id' => 'MANUAL-' . $order->invoice_number . '-' . now()->timestamp,
+                'payment_type' => 'manual',
+                'gross_amount' => $order->grand_total,
+                'currency' => 'IDR',
+                'transaction_status' => 'settlement',
+                'payload' => [
+                    'note' => 'Pembayaran manual oleh admin',
+                ],
+                'paid_at' => now(),
+            ]);
+        });
+
+        return back()->with(
+            'success',
+            'Order berhasil ditandai sebagai dibayar.'
         );
     }
 

@@ -207,6 +207,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:ad
     Route::prefix('orders')->name('orders.')->group(function () {
         Route::get('/', [AdminOrderController::class, 'index'])->name('index');
         Route::get('/{id}', [AdminOrderController::class, 'show'])->name('show');
+        Route::patch('/{id}/mark-as-paid', [AdminOrderController::class, 'markAsPaid'])->name('mark-as-paid');
         Route::patch('/{id}/process', [AdminOrderController::class, 'process'])->name('process');
         Route::patch('/{id}/shipment', [AdminOrderController::class, 'shipment'])->name('shipment');
         Route::patch('/{id}/complete', [AdminOrderController::class, 'complete'])->name('complete');

@@ -261,14 +261,14 @@
                                     @foreach ($order->paymentTransactions as $trx)
                                         <tr class="hover:bg-gray-50 transition-colors">
                                             <td class="px-5 py-3 font-mono text-xs text-gray-600">
-                                                {{ $trx->transaction_id ?? '-' }}
+                                                {{ $trx->gateway_transaction_id ?? '-' }}
                                             </td>
                                             <td class="px-5 py-3 text-gray-600">
                                                 {{ $trx->payment_type ?? ($order->paymentMethod?->name ?? '-') }}
                                             </td>
                                             <td class="px-5 py-3 font-medium text-gray-900">
                                                 Rp
-                                                {{ number_format($trx->amount ?? $order->grand_total, 0, ',', '.') }}
+                                                {{ number_format($trx->gross_amount ?? $order->grand_total, 0, ',', '.') }}
                                             </td>
                                             <td class="px-5 py-3">
                                                 @php
@@ -401,6 +401,24 @@
                         <p class="text-sm font-medium text-gray-900">Aksi</p>
                     </div>
                     <div class="px-5 py-4 space-y-2.5">
+
+                        {{-- Mark as paid: jika belum dibayar --}}
+                        @if ($order->payment_status !== 'paid' && !in_array($order->order_status, ['cancelled', 'refunded']))
+                            <form action="{{ route('admin.orders.mark-as-paid', request()->route('id')) }}" method="POST" x-data
+                                @submit.prevent="if(confirm('Tandai order ini sebagai pembayaran manual?')) $el.submit()">
+                                @csrf
+                                @method('PATCH')
+                                <button type="submit"
+                                    class="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Tandai Sebagai Pembayaran Manual
+                                </button>
+                            </form>
+                        @endif
 
                         {{-- Proses order: hanya jika status pending & sudah bayar --}}
                         @if ($order->order_status === 'pending' && $order->payment_status === 'paid')

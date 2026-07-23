@@ -515,6 +515,36 @@ class CheckoutController extends Controller
         /* ------------------------------------------------------------------ */
         /* Buat Order                                                           */
         /* ------------------------------------------------------------------ */
+        
+        // Prepare voucher snapshot data
+        $voucherCode = null;
+        $voucherName = null;
+        $voucherSnapshot = null;
+        $discountSource = 'none';
+        
+        if (!empty($appliedVouchers)) {
+            // Get first voucher for primary snapshot (legacy support)
+            $firstVoucher = Voucher::find($appliedVouchers[0]['id'] ?? null);
+            if ($firstVoucher) {
+                $voucherCode = $firstVoucher->code;
+                $voucherName = $firstVoucher->name;
+                $voucherSnapshot = [
+                    'id' => $firstVoucher->id,
+                    'code' => $firstVoucher->code,
+                    'name' => $firstVoucher->name,
+                    'type' => $firstVoucher->type,
+                    'value' => $firstVoucher->value,
+                    'discount_amount' => $appliedVouchers[0]['discount_amount'] ?? 0,
+                    'shipping_discount' => $appliedVouchers[0]['shipping_discount'] ?? 0,
+                ];
+            }
+            
+            // Determine discount source from first voucher
+            if ($firstVoucher) {
+                $discountSource = 'voucher';
+            }
+        }
+        
         $order = Order::create([
             'user_id'           => $user->id,
             'invoice_number'    => $this->generateInvoiceNumber(),
@@ -550,10 +580,20 @@ class CheckoutController extends Controller
             'final_shipping_cost' => $finalShippingCost,
             'grand_total'     => $grandTotal,
 
+            // Voucher snapshot (legacy - first voucher only)
+            'voucher_code' => $voucherCode,
+            'voucher_name' => $voucherName,
+            'voucher_snapshot' => $voucherSnapshot,
+            'voucher_type' => $voucherSnapshot['type'] ?? null,
+            'voucher_value' => $voucherSnapshot['value'] ?? null,
+            
             // Multiple vouchers snapshot
             'vouchers' => $appliedVouchers,
             'total_discount_amount' => $discountAmount,
             'total_shipping_discount' => $shippingDiscount,
+
+            // Discount source
+            'discount_source' => $discountSource,
 
             // Berat
             'total_weight' => $totalWeight,
