@@ -806,6 +806,31 @@ class VoucherService
     }
 
     /**
+     * Public wrapper untuk validasi quota dan rules
+     * Digunakan saat checkout untuk re-validate semua voucher
+     * 
+     * Returns array dengan struktur:
+     * ['valid' => true/false, 'message' => 'error message jika invalid']
+     */
+    public function validateVoucherQuotaAndRules(Voucher $voucher, Cart $cart): array
+    {
+        try {
+            $this->validateQuotaAndRules($voucher, $cart);
+            return ['valid' => true, 'message' => null];
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return [
+                'valid' => false,
+                'message' => $e->errors()['voucher'][0] ?? 'Voucher tidak valid.'
+            ];
+        } catch (\Exception $e) {
+            return [
+                'valid' => false,
+                'message' => $e->getMessage() ?: 'Voucher dibatalkan karena tidak memenuhi syarat.'
+            ];
+        }
+    }
+
+    /**
      * Check voucher eligibility against current cart/shipping/payment
      * Returns structured array with is_eligible, reasons, and optional discount_info
      */

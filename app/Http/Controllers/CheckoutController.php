@@ -436,10 +436,10 @@ class CheckoutController extends Controller
                         
                         if ($voucher) {
                             // Re-validate voucher
-                            $validationRules = $voucherService->validateQuotaAndRules($voucher, $cart, $user);
+                            $validationResult = $voucherService->validateVoucherQuotaAndRules($voucher, $cart);
                             
-                            if (!$validationRules['valid']) {
-                                throw new \Exception($validationRules['message']);
+                            if (!$validationResult['valid']) {
+                                throw new \Exception($validationResult['message']);
                             }
                             
                             // Accumulate discounts
