@@ -127,7 +127,8 @@
                 <div class="absolute top-0 right-4 z-10">
                     <div class="ticket-ribbon px-2.5 pt-1 pb-2 text-[11px] font-bold text-white"
                         :class="voucher.user_remaining_quota === 0 ? 'bg-gray-400' : 'bg-rose-500'">
-                        <span x-text="voucher.user_remaining_quota === 0 ? 'Limit Tercapai' : ('x' + voucher.user_remaining_quota)"></span>
+                        <span
+                            x-text="voucher.user_remaining_quota === 0 ? 'Limit Tercapai' : ('x' + voucher.user_remaining_quota)"></span>
                     </div>
                 </div>
 
@@ -136,7 +137,7 @@
                     class="w-24 md:w-28 flex-shrink-0 bg-emerald-500 flex flex-col items-center justify-center gap-2 px-2 py-3">
                     <div class="w-10 h-10 rounded-lg bg-white/90 flex items-center justify-center overflow-hidden">
                         <img :src="getImageUrl(voucher.image_path)" :alt="voucher.name"
-                            class="w-6 h-6 object-contain" onerror="this.src='/images/placeholder.png'">
+                            class="w-6 h-6 object-contain" @onerror="$el.src=getPlaceholderSvg()">
                     </div>
                     <span class="text-[10px] font-bold text-white text-center uppercase leading-tight line-clamp-2"
                         x-text="voucher.category_label ?? 'Semua Kategori'"></span>
@@ -230,7 +231,7 @@
                 <!-- Image -->
                 <div class="rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 aspect-square">
                     <img :src="getImageUrl(detail?.image_path)" :alt="detail?.name"
-                        class="w-full h-full object-cover">
+                        class="w-full h-full object-cover" @onerror="$el.src=getPlaceholderSvg()">
                 </div>
 
                 <!-- Description -->
@@ -268,7 +269,9 @@
                             <li x-text="`Sisa Stok: ${detail.remaining_quota}`"></li>
                         </template>
                         <template x-if="detail?.user_remaining_quota !== undefined">
-                            <li x-text="`Bisa Digunakan: ${detail.user_remaining_quota} dari ${detail.max_usage_per_user}x`"></li>
+                            <li
+                                x-text="`Bisa Digunakan: ${detail.user_remaining_quota} dari ${detail.max_usage_per_user}x`">
+                            </li>
                         </template>
                         <li x-text="`Bisa dikombinasi: ${detail?.is_combinable ? 'Ya' : 'Tidak'}`"></li>
                     </ul>
@@ -381,8 +384,12 @@
                     return this.applied.some(v => v.id === id);
                 },
 
+                getPlaceholderSvg() {
+                    return 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23e5e7eb%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%22 y=%2250%22 font-size=%2212%22 fill=%22%239ca3af%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22%3E?%3C/text%3E%3C/svg%3E';
+                },
+
                 getImageUrl(path) {
-                    if (!path) return '/images/placeholder.png';
+                    if (!path) return this.getPlaceholderSvg();
                     return path.startsWith('http') ? path : '/storage/' + path;
                 },
 
