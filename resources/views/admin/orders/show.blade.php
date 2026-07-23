@@ -73,11 +73,11 @@
                 <div class="rounded-xl border border-gray-100 bg-white overflow-hidden">
                     <div class="px-5 py-4 border-b border-gray-100">
                         <p class="text-sm font-medium text-gray-900">Item Pesanan</p>
-                        <p class="text-xs text-gray-400 mt-0.5">{{ $order->items->count() }} produk</p>
+                        <p class="text-xs text-gray-400 mt-0.5">{{ $order->items?->count() ?? 0 }} produk</p>
                     </div>
 
                     <div class="divide-y divide-gray-50">
-                        @foreach ($order->items as $item)
+                        @forelse ($order->items ?? [] as $item)
                             <div class="flex items-center gap-4 px-5 py-4">
 
                                 {{-- Thumbnail produk --}}
@@ -123,7 +123,11 @@
                                 </div>
 
                             </div>
-                        @endforeach
+                        @empty
+                            <div class="px-5 py-4 text-center text-sm text-gray-500">
+                                Tidak ada item dalam order ini
+                            </div>
+                        @endforelse
                     </div>
 
                     {{-- Ringkasan harga --}}
@@ -131,7 +135,7 @@
                         <div class="flex items-center justify-between text-sm text-gray-500">
                             <span>Subtotal</span>
                             <span>Rp
-                                {{ number_format($order->subtotal_amount ?? $order->total_amount, 0, ',', '.') }}</span>
+                                {{ number_format($order->subtotal ?? 0, 0, ',', '.') }}</span>
                         </div>
                         @if ($order->shipping_cost ?? false)
                             <div class="flex items-center justify-between text-sm text-gray-500">
@@ -148,14 +152,14 @@
                         <div class="flex items-center justify-between border-t border-gray-100 pt-2">
                             <span class="text-sm font-semibold text-gray-900">Total</span>
                             <span class="text-sm font-semibold text-gray-900">
-                                Rp {{ number_format($order->total_amount, 0, ',', '.') }}
+                                Rp {{ number_format($order->grand_total ?? 0, 0, ',', '.') }}
                             </span>
                         </div>
                     </div>
                 </div>
 
                 {{-- Shipment info --}}
-                @if ($order->shipments->isNotEmpty())
+                @if ($order->shipments?->isNotEmpty())
                     @php $shipment = $order->shipments->last(); @endphp
                     <div class="rounded-xl border border-gray-100 bg-white overflow-hidden">
                         <div class="px-5 py-4 border-b border-gray-100">
@@ -227,7 +231,7 @@
                 @endif
 
                 {{-- Payment transactions --}}
-                @if ($order->paymentTransactions->isNotEmpty())
+                @if ($order->paymentTransactions?->isNotEmpty())
                     <div class="rounded-xl border border-gray-100 bg-white overflow-hidden">
                         <div class="px-5 py-4 border-b border-gray-100">
                             <p class="text-sm font-medium text-gray-900">Riwayat Transaksi</p>
@@ -264,7 +268,7 @@
                                             </td>
                                             <td class="px-5 py-3 font-medium text-gray-900">
                                                 Rp
-                                                {{ number_format($trx->amount ?? $order->total_amount, 0, ',', '.') }}
+                                                {{ number_format($trx->amount ?? $order->grand_total, 0, ',', '.') }}
                                             </td>
                                             <td class="px-5 py-3">
                                                 @php
@@ -385,7 +389,7 @@
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-gray-400">Tanggal Order</span>
                             <span class="text-sm text-gray-700">
-                                {{ $order->created_at->format('d M Y') }}
+                                {{ $order->created_at?->format('d M Y') ?? 'N/A' }}
                             </span>
                         </div>
                     </div>
@@ -400,7 +404,7 @@
 
                         {{-- Proses order: hanya jika status pending & sudah bayar --}}
                         @if ($order->order_status === 'pending' && $order->payment_status === 'paid')
-                            <form action="{{ route('admin.orders.process', $order) }}" method="POST">
+                            <form action="{{ route('admin.orders.process', request()->route('id')) }}" method="POST">
                                 @csrf
                                 @method('PUT')
                                 <button type="submit"
@@ -417,7 +421,7 @@
 
                         {{-- Buat shipment: hanya jika status processing --}}
                         @if ($order->order_status === 'processing')
-                            <a href="{{ route('admin.orders.shipment', $order) }}"
+                            <a href="{{ route('admin.orders.shipment', request()->route('id')) }}"
                                 class="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                     viewBox="0 0 24 24" stroke="currentColor">
@@ -432,7 +436,7 @@
 
                         {{-- Mark delivered: hanya jika sudah shipped --}}
                         @if ($order->order_status === 'shipped')
-                            <form action="{{ route('admin.orders.delivered', $order) }}" method="POST" x-data
+                            <form action="{{ route('admin.orders.delivered', request()->route('id')) }}" method="POST" x-data
                                 @submit.prevent="if(confirm('Tandai order ini sebagai terkirim?')) $el.submit()">
                                 @csrf
                                 @method('PUT')
@@ -450,7 +454,7 @@
 
                         {{-- Refund: jika sudah paid tapi belum shipped --}}
                         @if (in_array($order->order_status, ['pending', 'processing', 'completed']) && $order->payment_status === 'paid')
-                            <form action="{{ route('admin.orders.refund', $order) }}" method="POST" x-data
+                            <form action="{{ route('admin.orders.refund', request()->route('id')) }}" method="POST" x-data
                                 @submit.prevent="if(confirm('Proses refund untuk order ini?')) $el.submit()">
                                 @csrf
                                 @method('PUT')
@@ -468,7 +472,7 @@
 
                         {{-- Cancel: jika belum shipped --}}
                         @if (!in_array($order->order_status, ['shipped', 'completed', 'cancelled', 'refunded']))
-                            <form action="{{ route('admin.orders.cancel', $order) }}" method="POST" x-data
+                            <form action="{{ route('admin.orders.cancel', request()->route('id')) }}" method="POST" x-data
                                 @submit.prevent="if(confirm('Batalkan order ini?')) $el.submit()">
                                 @csrf
                                 @method('PUT')

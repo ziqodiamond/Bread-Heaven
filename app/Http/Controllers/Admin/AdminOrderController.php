@@ -55,16 +55,16 @@ class AdminOrderController extends Controller
     /**
      * Detail order
      */
-    public function show(Order $order)
+    public function show($id)
     {
-        $order->load([
+        $order = Order::with([
             'user',
             'address',
             'items.product',
             'paymentMethod',
             'paymentTransactions',
             'shipments',
-        ]);
+        ])->findOrFail($id);
 
         return view('admin.orders.show', compact('order'));
     }
