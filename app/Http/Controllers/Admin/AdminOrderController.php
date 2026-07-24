@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
 use App\Models\Shipment;
+use App\Models\ShippingMethod;
 use App\Services\MidtransService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -67,7 +68,32 @@ class AdminOrderController extends Controller
             'shipments',
         ])->findOrFail($id);
 
-        return view('admin.orders.show', compact('order'));
+        // Get available shipping methods grouped by courier
+        $shippingMethods = ShippingMethod::where('status', 'available')
+            ->orderBy('courier_name')
+            ->get();
+
+        // Group by courier_name
+        $couriers = [];
+        foreach ($shippingMethods as $method) {
+            $courierName = $method->courier_name;
+            if (!isset($couriers[$courierName])) {
+                $couriers[$courierName] = [
+                    'code' => $method->courier_code ?? strtolower($courierName),
+                    'name' => $courierName,
+                    'services' => [],
+                ];
+            }
+            $couriers[$courierName]['services'][] = [
+                'name' => $method->service_name,
+                'code' => $method->service_code,
+            ];
+        }
+
+        // Reset array keys
+        $couriers = array_values($couriers);
+
+        return view('admin.orders.show', compact('order', 'couriers'));
     }
 
     /**
@@ -161,12 +187,10 @@ class AdminOrderController extends Controller
             );
         });
 
-        return redirect()
-            ->route('admin.orders.show', $order)
-            ->with(
-                'success',
-                'Shipment berhasil dibuat.'
-            );
+        return back()->with(
+            'success',
+            'Shipment berhasil dibuat.'
+        );
     }
 
     /**

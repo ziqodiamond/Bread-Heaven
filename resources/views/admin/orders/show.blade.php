@@ -1,5 +1,5 @@
 <x-layout-admin>
-    <div class="space-y-5">
+    <div class="space-y-5" x-data="modalData()" @open-shipment.window="openModal()" @keydown.escape.window="closeModal()">
 
         {{-- Header + Back button --}}
         <div class="flex items-start justify-between">
@@ -439,7 +439,7 @@
 
                         {{-- Buat shipment: hanya jika status processing --}}
                         @if ($order->order_status === 'processing')
-                            <a href="{{ route('admin.orders.shipment', request()->route('id')) }}"
+                            <button @click="$dispatch('open-shipment')"
                                 class="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                     viewBox="0 0 24 24" stroke="currentColor">
@@ -449,7 +449,7 @@
                                         d="M14 4v4h4M9 13h6M9 17h3" />
                                 </svg>
                                 Input Resi & Kirim
-                            </a>
+                            </button>
                         @endif
 
                         {{-- Mark delivered: hanya jika sudah shipped --}}
@@ -514,5 +514,255 @@
 
         </div>
 
-    </div>
+        {{-- Modal Shipment Form (Alpine.js) --}}
+        <template x-if="openShipment">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" 
+            aria-modal="true" role="dialog" @click.self="openShipment = false">
+
+            <div x-transition:enter="transition ease-out duration-200" 
+                x-transition:enter-start="translate-y-4 opacity-0"
+                x-transition:enter-end="translate-y-0 opacity-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="translate-y-0 opacity-100"
+                x-transition:leave-end="translate-y-4 opacity-0"
+                class="w-full max-w-3xl md:max-w-2xl lg:max-w-3xl bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden">
+
+                {{-- Header --}}
+                <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gray-50">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">Input Resi & Kirim</h3>
+                        <p class="text-xs text-gray-400 mt-0.5">Invoice: {{ $order->invoice_number }}</p>
+                    </div>
+                    <button @click="openShipment = false"
+                        class="flex items-center justify-center size-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                        <svg class="size-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Content --}}
+                <div class="px-6 py-5 max-h-[calc(100vh-200px)] overflow-y-auto">
+
+                    {{-- Alamat Pengiriman (Paling Atas) --}}
+                    @if ($order->shipping_receiver_name || $order->shipping_full_address)
+                        <div class="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div class="flex gap-2">
+                                <svg class="h-5 w-5 text-blue-600 shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M5.5 13a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1 4.5 4.5 0 11-4.814 6.946z" />
+                                </svg>
+                                <div class="text-sm flex-1">
+                                    <p class="font-medium text-blue-900 mb-2">Alamat Pengiriman</p>
+                                    <div class="text-blue-800 space-y-1">
+                                        @if ($order->shipping_receiver_name)
+                                            <p><strong>{{ $order->shipping_receiver_name }}</strong></p>
+                                        @endif
+                                        @if ($order->shipping_receiver_phone)
+                                            <p>{{ $order->shipping_receiver_phone }}</p>
+                                        @endif
+                                        @if ($order->shipping_full_address)
+                                            <p>{{ $order->shipping_full_address }}</p>
+                                        @endif
+                                        @if ($order->shipping_city || $order->shipping_postal_code)
+                                            <p class="text-blue-600">{{ $order->shipping_city }} {{ $order->shipping_postal_code }}</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Current Shipping Info (jika ada) --}}
+                    @if ($order->shipping_courier || $order->shipping_service || $order->shipping_notes)
+                        <div class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div class="flex gap-2">
+                                <svg class="h-5 w-5 text-green-600 shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                </svg>
+                                <div class="text-sm flex-1">
+                                    <p class="font-medium text-green-900 mb-2">Informasi Pengiriman Saat Ini</p>
+                                    <div class="text-green-800 space-y-1 text-xs">
+                                        @if ($order->shipping_courier)
+                                            <p><strong>Kurir:</strong> {{ $order->shipping_courier }}</p>
+                                        @endif
+                                        @if ($order->shipping_service)
+                                            <p><strong>Layanan:</strong> {{ $order->shipping_service }}</p>
+                                        @endif
+                                        @if ($order->shipping_notes)
+                                            <p><strong>Catatan:</strong> {{ $order->shipping_notes }}</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Pilihan metode pengiriman --}}
+                    <div class="mb-6">
+                        <label class="block text-sm font-semibold text-gray-900 mb-3">Metode Pengiriman</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="relative flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer transition-all hover:border-indigo-300" 
+                                :class="method === 'delivery' ? 'bg-indigo-50 border-indigo-300' : 'bg-white hover:bg-gray-50'">
+                                <input type="radio" name="method" value="delivery" x-model="method" class="w-4 h-4 accent-indigo-600" checked>
+                                <div class="ml-3">
+                                    <span class="block text-sm font-medium text-gray-900">Dikirim</span>
+                                    <span class="text-xs text-gray-500">Kurrir Pengiriman</span>
+                                </div>
+                            </label>
+                            <label class="relative flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer transition-all hover:border-green-300"
+                                :class="method === 'pickup' ? 'bg-green-50 border-green-300' : 'bg-white hover:bg-gray-50'">
+                                <input type="radio" name="method" value="pickup" x-model="method" class="w-4 h-4 accent-green-600">
+                                <div class="ml-3">
+                                    <span class="block text-sm font-medium text-gray-900">Ambil</span>
+                                    <span class="text-xs text-gray-500">Self Pickup</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                {{-- Form Dikirim --}}
+                <div x-show="method === 'delivery'" x-transition class="space-y-4">
+                    <form action="{{ route('admin.orders.shipment', request()->route('id')) }}" method="POST" 
+                        onsubmit="const parts = (document.getElementById('courier_name')?.value || '').split('|'); document.getElementById('courier_name_hidden').value = parts[0] || ''; document.getElementById('courier_service_hidden').value = parts[1] || ''; return confirm('Buat shipment dengan data ini?');">
+
+                        @csrf
+                        @method('PATCH')
+
+                        <input type="hidden" name="method" value="delivery">
+                        <input type="hidden" name="courier_name" id="courier_name_hidden" value="">
+                        <input type="hidden" name="courier_service" id="courier_service_hidden" value="">
+
+                        {{-- Pilih Kurir & Layanan --}}
+                        <div>
+                            <label for="courier_name" class="block text-sm font-medium text-gray-700 mb-2">
+                                Pilih Kurir & Layanan <span class="text-red-500">*</span>
+                            </label>
+                            <select name="courier_name" id="courier_name" x-model="selectedCourier"
+                                class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-sm text-gray-900"
+                                required>
+                                <option value="">-- Pilih Kurir --</option>
+                                <template x-for="courier in couriersData" :key="courier.code">
+                                    <optgroup :label="courier.name + ' - Layanan:'">
+                                        <template x-for="service in courier.services" :key="service.code">
+                                            <option :value="`${courier.code}|${service.code}`" 
+                                                x-text="`${courier.name} - ${service.name}`">
+                                            </option>
+                                        </template>
+                                    </optgroup>
+                                </template>
+                            </select>
+                            @error('courier_name')
+                                <p class="text-xs text-red-500 mt-1.5">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        {{-- Biaya Pengiriman --}}
+                        <template x-if="selectedCourier">
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium text-amber-900">Estimasi Biaya Pengiriman</span>
+                                    <span class="text-lg font-bold text-amber-900" x-text="`Rp ${new Intl.NumberFormat('id-ID').format({{ $order->shipping_cost ?? 0 }})}`"></span>
+                                </div>
+                                <p class="text-xs text-amber-700 mt-2">*Biaya mungkin berubah sesuai dengan layanan yang dipilih</p>
+                            </div>
+                        </template>
+
+                        {{-- Input Nomor Resi --}}
+                        <div>
+                            <label for="tracking_number" class="block text-sm font-medium text-gray-700 mb-2">
+                                Nomor Resi <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="tracking_number" id="tracking_number"
+                                class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-sm text-gray-900"
+                                placeholder="Contoh: 1234567890ABCD" required>
+                            @error('tracking_number')
+                                <p class="text-xs text-red-500 mt-1.5">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        {{-- Catatan (Optional) --}}
+                        <div>
+                            <label for="notes" class="block text-sm font-medium text-gray-700 mb-2">
+                                Catatan <span class="text-gray-400">(Opsional)</span>
+                            </label>
+                            <textarea name="notes" id="notes"
+                                class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-sm text-gray-900 resize-none"
+                                placeholder="Catatan tambahan untuk pengiriman..." rows="2" maxlength="500"></textarea>
+                            <p class="text-xs text-gray-400 mt-1">Max 500 karakter</p>
+                        </div>
+
+                        {{-- Buttons --}}
+                        <div class="flex gap-2 justify-end pt-4 border-t border-gray-100">
+                            <button type="button" @click="openShipment = false" :disabled="loading"
+                                class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                Batal
+                            </button>
+                            <button type="submit" :disabled="loading"
+                                class="px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                                <span x-show="!loading">Simpan & Kirim</span>
+                                <span x-show="loading" class="flex items-center gap-1.5">
+                                    <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Memproses...
+                                </span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {{-- Form Ambil di Tempat --}}
+                <div x-show="method === 'pickup'" x-transition class="space-y-4">
+                    <form action="{{ route('admin.orders.shipment', request()->route('id')) }}" method="POST" onsubmit="return confirm('Tandai order siap diambil?');">
+                        @csrf
+                        @method('PATCH')
+
+                        <input type="hidden" name="method" value="pickup">
+                        <input type="hidden" name="courier_name" value="self-pickup">
+                        <input type="hidden" name="courier_service" value="Ambil di Tempat">
+                        <input type="hidden" name="tracking_number" value="PICKUP">
+
+                        {{-- Catatan (Optional) --}}
+                        <div>
+                            <label for="notes_pickup" class="block text-sm font-medium text-gray-700 mb-2">
+                                Catatan <span class="text-gray-400">(Opsional)</span>
+                            </label>
+                            <textarea name="notes" id="notes_pickup"
+                                class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-sm text-gray-900 resize-none"
+                                placeholder="Contoh: Diletakkan di loket... atau waktu tersedia..." rows="2" maxlength="500"></textarea>
+                            <p class="text-xs text-gray-400 mt-1">Max 500 karakter</p>
+                        </div>
+
+                        {{-- Buttons --}}
+                        <div class="flex gap-2 justify-end pt-4 border-t border-gray-100">
+                            <button type="button" @click="openShipment = false" :disabled="loading"
+                                class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                Batal
+                            </button>
+                            <button type="submit" :disabled="loading"
+                                class="px-4 py-2.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                                <span x-show="!loading">Tandai Siap Diambil</span>
+                                <span x-show="loading" class="flex items-center gap-1.5">
+                                    <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Memproses...
+                                </span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </template>
+
+    <script>
+        window.COURIERS_DATA = @json($couriers ?? []);
+    </script>
+
+</div>
+
 </x-layout-admin>
