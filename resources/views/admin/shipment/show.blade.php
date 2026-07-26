@@ -141,35 +141,27 @@
                     {{-- Action buttons --}}
                     @if (!in_array($shipment->status, ['delivered', 'cancelled']))
                         <div class="flex gap-2 px-5 pb-5">
-                            <form action="{{ route('admin.shipments.delivered', $shipment->id) }}" method="POST" x-data
-                                @submit.prevent="if(confirm('Tandai sebagai terkirim?')) $el.submit()" class="flex-1">
-                                @csrf
-                                @method('PATCH')
-                                <button type="submit"
-                                    class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                            d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Tandai Terkirim
-                                </button>
-                            </form>
+                            <button type="button"
+                                onclick="confirmAction('Tandai shipment ini sebagai terkirim?', '{{ route('admin.shipment.delivered', $shipment->id) }}', 'PATCH')"
+                                class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                        d="M5 13l4 4L19 7" />
+                                </svg>
+                                Tandai Terkirim
+                            </button>
 
-                            <form action="{{ route('admin.shipments.cancel', $shipment->id) }}" method="POST" x-data
-                                @submit.prevent="if(confirm('Batalkan shipment ini?')) $el.submit()" class="flex-1">
-                                @csrf
-                                @method('PATCH')
-                                <button type="submit"
-                                    class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-100 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                            d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                    Batalkan
-                                </button>
-                            </form>
+                            <button type="button"
+                                onclick="confirmAction('Batalkan shipment ini?', '{{ route('admin.shipment.cancel', $shipment->id) }}', 'PATCH')"
+                                class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Batalkan
+                            </button>
                         </div>
                     @endif
                 </div>

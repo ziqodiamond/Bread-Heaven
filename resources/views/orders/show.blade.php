@@ -294,6 +294,18 @@
 
                         </a>
                     @endif
+
+                    {{-- BUTTON TERIMA BARANG --}}
+                    @if ($order->order_status === 'shipped' && $order->payment_status === 'paid')
+                        <button
+                            onclick="confirmReceiveOrder('{{ route('orders.receive', $order->id) }}', '{{ $order->invoice_number }}')"
+                            class="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-green-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700">
+
+                            ✓ Terima Barang
+
+                        </button>
+                    @endif
+
                     @if (in_array($order->payment_status, ['unpaid', 'pending']))
                         <form action="{{ route('orders.cancel', $order->id) }}" method="POST">
 

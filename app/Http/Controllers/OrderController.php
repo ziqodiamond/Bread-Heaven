@@ -161,4 +161,47 @@ class OrderController extends Controller
             'Pesanan berhasil dibatalkan'
         );
     }
+
+    public function receive(string $id)
+    {
+        $order = \App\Models\Order::findOrFail($id);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pastikan order milik user login
+        |--------------------------------------------------------------------------
+        */
+
+        abort_if(
+            $order->user_id !== auth()->id(),
+            403
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validasi status - hanya bisa receive jika status shipped
+        |--------------------------------------------------------------------------
+        */
+
+        if ($order->order_status !== 'shipped') {
+
+            return back()->with(
+                'error',
+                'Pesanan harus dalam status terkirim untuk ditandai diterima'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Mark order as completed
+        |--------------------------------------------------------------------------
+        */
+
+        $order->markAsCompleted();
+
+        return back()->with(
+            'success',
+            'Pesanan berhasil ditandai sebagai diterima'
+        );
+    }
 }

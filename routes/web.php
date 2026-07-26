@@ -102,6 +102,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/history', [OrderController::class, 'history'])->name('history');
         Route::get('/{id}', [OrderController::class, 'show'])->name('show');
         Route::post('/{id}/cancel', [OrderController::class, 'cancel'])->name('cancel');
+        Route::post('/{id}/receive', [OrderController::class, 'receive'])->name('receive');
     });
 
     Route::prefix('/transaction')->name('transaction.')->group(function () {

@@ -344,4 +344,25 @@ class AdminOrderController extends Controller
             default => null,
         };
     }
+
+    /**
+     * Mark order as complete
+     */
+    public function complete(Order $order)
+    {
+        if ($order->order_status !== 'shipped') {
+
+            return back()->with(
+                'error',
+                'Order harus dalam status terkirim untuk diselesaikan.'
+            );
+        }
+
+        $order->markAsCompleted();
+
+        return back()->with(
+            'success',
+            'Order berhasil diselesaikan.'
+        );
+    }
 }

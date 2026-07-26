@@ -454,20 +454,16 @@
 
                         {{-- Mark delivered: hanya jika sudah shipped --}}
                         @if ($order->order_status === 'shipped')
-                            <form action="{{ route('admin.orders.delivered', $order->id) }}" method="POST" x-data
-                                @submit.prevent="if(confirm('Tandai order ini sebagai terkirim?')) $el.submit()">
-                                @csrf
-                                @method('PUT')
-                                <button type="submit"
-                                    class="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                            d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Tandai Terkirim
-                                </button>
-                            </form>
+                            <button type="button"
+                                onclick="confirmAction('Tandai order ini sebagai terkirim?', '{{ route('admin.orders.delivered', $order->id) }}', 'POST')"
+                                class="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                        d="M5 13l4 4L19 7" />
+                                </svg>
+                                Tandai Terkirim
+                            </button>
                         @endif
 
                         {{-- Refund: jika sudah paid tapi belum shipped --}}

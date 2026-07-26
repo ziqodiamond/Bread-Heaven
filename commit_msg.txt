@@ -1,0 +1,10 @@
+Menambahkan konfirmasi & tombol "Terima Barang" serta refactor aksi tombol
+
+- Menambah tombol "Terima Barang" pada resources/views/orders/show.blade.php yang memanggil confirmReceiveOrder() dan route POST /orders/{id}/receive
+- Menambah method receive() di OrderController untuk validasi ownership dan status lalu menandai order completed
+- Menambah method complete() di AdminOrderController untuk menyelesaikan order dari admin
+- Mengganti form inline di beberapa view admin menjadi pemanggilan confirmAction() (menggunakan SweetAlert2) untuk konfirmasi aksi
+- Menambahkan sweetalert2 dependency dan helper JS di resources/js/app.js
+- Memperbarui routes/web.php untuk route orders.receive
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
