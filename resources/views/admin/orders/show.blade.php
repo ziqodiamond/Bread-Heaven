@@ -404,7 +404,7 @@
 
                         {{-- Mark as paid: jika belum dibayar --}}
                         @if ($order->payment_status !== 'paid' && !in_array($order->order_status, ['cancelled', 'refunded']))
-                            <form action="{{ route('admin.orders.mark-as-paid', request()->route('id')) }}" method="POST" x-data
+                            <form action="{{ route('admin.orders.mark-as-paid', $order->id) }}" method="POST" x-data
                                 @submit.prevent="if(confirm('Tandai order ini sebagai pembayaran manual?')) $el.submit()">
                                 @csrf
                                 @method('PATCH')
@@ -422,7 +422,7 @@
 
                         {{-- Proses order: hanya jika status pending & sudah bayar --}}
                         @if ($order->order_status === 'pending' && $order->payment_status === 'paid')
-                            <form action="{{ route('admin.orders.process', request()->route('id')) }}" method="POST">
+                            <form action="{{ route('admin.orders.process', $order->id) }}" method="POST">
                                 @csrf
                                 @method('PUT')
                                 <button type="submit"
@@ -454,7 +454,7 @@
 
                         {{-- Mark delivered: hanya jika sudah shipped --}}
                         @if ($order->order_status === 'shipped')
-                            <form action="{{ route('admin.orders.delivered', request()->route('id')) }}" method="POST" x-data
+                            <form action="{{ route('admin.orders.delivered', $order->id) }}" method="POST" x-data
                                 @submit.prevent="if(confirm('Tandai order ini sebagai terkirim?')) $el.submit()">
                                 @csrf
                                 @method('PUT')
@@ -472,7 +472,7 @@
 
                         {{-- Refund: jika sudah paid tapi belum shipped --}}
                         @if (in_array($order->order_status, ['pending', 'processing', 'completed']) && $order->payment_status === 'paid')
-                            <form action="{{ route('admin.orders.refund', request()->route('id')) }}" method="POST" x-data
+                            <form action="{{ route('admin.orders.refund', $order->id) }}" method="POST" x-data
                                 @submit.prevent="if(confirm('Proses refund untuk order ini?')) $el.submit()">
                                 @csrf
                                 @method('PUT')
@@ -490,7 +490,7 @@
 
                         {{-- Cancel: jika belum shipped --}}
                         @if (!in_array($order->order_status, ['shipped', 'completed', 'cancelled', 'refunded']))
-                            <form action="{{ route('admin.orders.cancel', request()->route('id')) }}" method="POST" x-data
+                            <form action="{{ route('admin.orders.cancel', $order->id) }}" method="POST" x-data
                                 @submit.prevent="if(confirm('Batalkan order ini?')) $el.submit()">
                                 @csrf
                                 @method('PUT')
@@ -622,11 +622,10 @@
 
                 {{-- Form Dikirim --}}
                 <div x-show="method === 'delivery'" x-transition class="space-y-4">
-                    <form action="{{ route('admin.orders.shipment', request()->route('id')) }}" method="POST" 
+                    <form action="{{ route('admin.orders.shipment', $order->id) }}" method="POST" 
                         onsubmit="const parts = (document.getElementById('courier_name')?.value || '').split('|'); document.getElementById('courier_name_hidden').value = parts[0] || ''; document.getElementById('courier_service_hidden').value = parts[1] || ''; return confirm('Buat shipment dengan data ini?');">
 
                         @csrf
-                        @method('PATCH')
 
                         <input type="hidden" name="method" value="delivery">
                         <input type="hidden" name="courier_name" id="courier_name_hidden" value="">
@@ -714,9 +713,8 @@
 
                 {{-- Form Ambil di Tempat --}}
                 <div x-show="method === 'pickup'" x-transition class="space-y-4">
-                    <form action="{{ route('admin.orders.shipment', request()->route('id')) }}" method="POST" onsubmit="return confirm('Tandai order siap diambil?');">
+                    <form action="{{ route('admin.orders.shipment', $order->id) }}" method="POST" onsubmit="return confirm('Tandai order siap diambil?');">
                         @csrf
-                        @method('PATCH')
 
                         <input type="hidden" name="method" value="pickup">
                         <input type="hidden" name="courier_name" value="self-pickup">

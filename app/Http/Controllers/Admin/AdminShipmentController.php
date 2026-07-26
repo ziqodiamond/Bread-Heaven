@@ -73,6 +73,30 @@ class AdminShipmentController extends Controller
     }
 
     /**
+     * Update tracking number dan mark as shipped
+     */
+    public function updateTrackingNumber(
+        Shipment $shipment,
+        Request $request
+    ) {
+        $request->validate([
+            'tracking_number' => 'required|string|min:3',
+        ], [
+            'tracking_number.required' => 'Nomor resi harus diisi',
+            'tracking_number.min' => 'Nomor resi minimal 3 karakter',
+        ]);
+
+        $shipment->markAsShipped(
+            $request->input('tracking_number')
+        );
+
+        return back()->with(
+            'success',
+            'Resi berhasil disimpan dan order status diubah menjadi shipped.'
+        );
+    }
+
+    /**
      * Cancel shipment
      */
     public function cancel(

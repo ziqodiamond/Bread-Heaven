@@ -206,13 +206,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:ad
 
     Route::prefix('orders')->name('orders.')->group(function () {
         Route::get('/', [AdminOrderController::class, 'index'])->name('index');
-        Route::get('/{id}', [AdminOrderController::class, 'show'])->name('show');
-        Route::patch('/{id}/mark-as-paid', [AdminOrderController::class, 'markAsPaid'])->name('mark-as-paid');
-        Route::patch('/{id}/process', [AdminOrderController::class, 'process'])->name('process');
-        Route::patch('/{id}/shipment', [AdminOrderController::class, 'shipment'])->name('shipment');
-        Route::patch('/{id}/complete', [AdminOrderController::class, 'complete'])->name('complete');
-        Route::patch('/{id}/cancel', [AdminOrderController::class, 'cancel'])->name('cancel');
-        Route::patch('/{id}/refund', [AdminOrderController::class, 'refund'])->name('refund');
+        Route::get('/{order}', [AdminOrderController::class, 'show'])->name('show');
+        Route::patch('/{order}/mark-as-paid', [AdminOrderController::class, 'markAsPaid'])->name('mark-as-paid');
+        Route::patch('/{order}/process', [AdminOrderController::class, 'process'])->name('process');
+        Route::post('/{order}/shipment', [AdminOrderController::class, 'storeShipment'])->name('shipment');
+        Route::patch('/{order}/delivered', [AdminOrderController::class, 'delivered'])->name('delivered');
+        Route::patch('/{order}/complete', [AdminOrderController::class, 'complete'])->name('complete');
+        Route::patch('/{order}/cancel', [AdminOrderController::class, 'cancel'])->name('cancel');
+        Route::patch('/{order}/refund', [AdminOrderController::class, 'refund'])->name('refund');
     });
 
     Route::prefix('payment')->name('payment.')->group(function () {
@@ -223,6 +224,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:ad
     Route::prefix('shipment')->name('shipment.')->group(function () {
         Route::get('/', [AdminShipmentController::class, 'index'])->name('index');
         Route::get('/{id}', [AdminShipmentController::class, 'show'])->name('show');
+        Route::patch('/{id}/tracking', [AdminShipmentController::class, 'updateTrackingNumber'])->name('tracking');
         Route::patch('/{id}/delivered', [AdminShipmentController::class, 'delivered'])->name('delivered');
         Route::patch('/{id}/cancel', [AdminShipmentController::class, 'cancel'])->name('cancel');
     });

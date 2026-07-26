@@ -57,16 +57,16 @@ class AdminOrderController extends Controller
     /**
      * Detail order
      */
-    public function show($id)
+    public function show(Order $order)
     {
-        $order = Order::with([
+        $order->load([
             'user',
             'address',
             'items.product',
             'paymentMethod',
             'paymentTransactions',
             'shipments',
-        ])->findOrFail($id);
+        ]);
 
         // Get available shipping methods grouped by courier
         $shippingMethods = ShippingMethod::where('status', 'available')
@@ -287,10 +287,8 @@ class AdminOrderController extends Controller
     /**
      * Mark order as paid manually (for testing/webhook failures)
      */
-    public function markAsPaid(string $id)
+    public function markAsPaid(Order $order)
     {
-        $order = Order::findOrFail($id);
-
         if ($order->payment_status === 'paid') {
             return back()->with(
                 'error',

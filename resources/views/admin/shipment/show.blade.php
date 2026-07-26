@@ -97,6 +97,47 @@
 
                     </div>
 
+                    {{-- Form input resi --}}
+                    @if ($shipment->status === 'pending')
+                        <div class="border-t border-gray-100 px-5 py-4">
+                            <form action="{{ route('admin.shipment.tracking', $shipment->id) }}" method="POST">
+                                @csrf
+                                @method('PATCH')
+                                
+                                <div class="space-y-3">
+                                    <div>
+                                        <label for="tracking_number" class="block text-xs font-medium text-gray-700 mb-1.5">
+                                            Masukkan Nomor Resi
+                                        </label>
+                                        <input 
+                                            type="text" 
+                                            id="tracking_number" 
+                                            name="tracking_number"
+                                            value="{{ old('tracking_number') }}"
+                                            placeholder="Contoh: JKT123456789"
+                                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
+                                        />
+                                        @error('tracking_number')
+                                            <p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <button 
+                                        type="submit"
+                                        class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Simpan Resi & Kirim
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    @endif
+
                     {{-- Action buttons --}}
                     @if (!in_array($shipment->status, ['delivered', 'cancelled']))
                         <div class="flex gap-2 px-5 pb-5">

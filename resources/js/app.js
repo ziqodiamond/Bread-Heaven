@@ -9,6 +9,50 @@ import Alpine from "alpinejs";
 window.Alpine = Alpine;
 window.flatpickr = flatpickr;
 
+// Modal function - define BEFORE Alpine.start()
+window.modalData = function() {
+    return {
+        openShipment: false,
+        method: 'delivery',
+        selectedCourier: null,
+        loading: false,
+        couriersData: window.COURIERS_DATA || [],
+        
+        getServices() {
+            if (!this.selectedCourier) return [];
+            const courier = this.couriersData.find(c => c.code === this.selectedCourier);
+            return courier ? courier.services : [];
+        },
+        
+        resetForm() {
+            this.method = 'delivery';
+            this.selectedCourier = null;
+            this.loading = false;
+            const tracking = document.getElementById('tracking_number');
+            const notes = document.getElementById('notes');
+            const notesPick = document.getElementById('notes_pickup');
+            const courier = document.getElementById('courier_name');
+            const services = document.getElementById('services');
+            
+            if (tracking) tracking.value = '';
+            if (notes) notes.value = '';
+            if (notesPick) notesPick.value = '';
+            if (courier) courier.value = '';
+            if (services) services.value = '';
+        },
+        
+        openModal() {
+            this.openShipment = true;
+            this.resetForm();
+        },
+        
+        closeModal() {
+            this.openShipment = false;
+            this.resetForm();
+        }
+    }
+};
+
 Alpine.start();
 
 // Initialize flatpickr for flash sale datetime inputs
